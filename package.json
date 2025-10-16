@@ -1,0 +1,31 @@
+{
+  "name": "sleeper-mcp",
+  "version": "1.0.0",
+  "description": "Typescript MCP Server implementation for Sleeper Fantasy Football API",
+  "type": "module",
+  "scripts": {
+    "build": "npx tsc",
+    "start": "node dist/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/swcollard/sleeper-mcp.git"
+  },
+  "keywords": [],
+  "author": "swcollard",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/swcollard/sleeper-mcp/issues"
+  },
+  "homepage": "https://github.com/swcollard/sleeper-mcp#readme",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "express": "^5.1.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.3",
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3"
+  }
+}
