@@ -149,6 +149,73 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  "get_league_rosters",
+  {
+    title: "Get Rosters for Sleeper Fantasy League",
+    description:
+      "Fetches a list of fantasy football rosters from the Sleeper API for a given league id. Ask the user for their league id.",
+    inputSchema: {
+      league_id: z.string(),
+    },
+    outputSchema: {
+      rosters: z.array(
+        z.object({
+          roster_id: z.number(),
+          starters: z
+            .array(z.string())
+            .describe(
+              "The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
+            ),
+          players: z
+            .array(z.string())
+            .describe(
+              "The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
+            ),
+          owner_id: z.string(),
+          league_id: z.string(),
+          settings: z.object({
+            wins: z.number(),
+            waiver_position: z.number(),
+            waiver_budget_used: z.number(),
+            total_moves: z.number(),
+            ties: z.number(),
+            losses: z.number(),
+            fpts_decimal: z.number(),
+            fpts_against_decimal: z.number(),
+            fpts_against: z.number(),
+            fpts: z.number(),
+          }),
+        }),
+      ),
+    },
+  },
+  async ({ league_id }) => {
+    const response = await fetch(
+      `https://api.sleeper.app/v1/league/${league_id}/rosters`,
+    );
+
+    if (!response.ok) {
+      // Handle non-200 responses by throwing an error
+      throw new Error(
+        `Failed to fetch fantasy rosters. HTTP status: ${response.status} ${response.statusText}`,
+      );
+    }
+    // Parse the JSON response
+    const structuredContent = await response.json();
+    // Return the response in the expected tool output format
+    return {
+      content: [
+        {
+          type: "text",
+          text: `${JSON.stringify({ rosters: structuredContent }, null, 3)}`,
+        },
+      ],
+      structuredContent: { rosters: structuredContent },
+    };
+  },
+);
+
 // Set up Express and HTTP transport
 const app = express();
 app.use(express.json());
