@@ -57,6 +57,7 @@ server.registerTool(
     },
   },
   async () => {
+    console.log(`GET ${NFL_STATE_URL}`);
     const response = await fetch(NFL_STATE_URL);
 
     if (!response.ok) {
@@ -94,6 +95,7 @@ server.registerTool(
     },
   },
   async ({ name }) => {
+    console.log(`get_player_id for ${name}`);
     const id = playerNameToId.get(name);
 
     if (!id) {
@@ -128,6 +130,7 @@ server.registerTool(
     },
   },
   async ({ id }) => {
+    console.log(`get_player_name for ${id}`);
     const name = playerIdToName.get(id);
 
     if (!name) {
@@ -191,8 +194,121 @@ server.registerTool(
     },
   },
   async ({ league_id }) => {
+    console.log(`GET https://api.sleeper.app/v1/league/${league_id}/rosters`);
     const response = await fetch(
       `https://api.sleeper.app/v1/league/${league_id}/rosters`,
+    );
+
+    if (!response.ok) {
+      // Handle non-200 responses by throwing an error
+      throw new Error(
+        `Failed to fetch fantasy rosters. HTTP status: ${response.status} ${response.statusText}`,
+      );
+    }
+    // Parse the JSON response
+    const structuredContent = await response.json();
+    // Return the response in the expected tool output format
+    return {
+      content: [
+        {
+          type: "text",
+          text: `${JSON.stringify({ rosters: structuredContent }, null, 3)}`,
+        },
+      ],
+      structuredContent: { rosters: structuredContent },
+    };
+  },
+);
+
+server.registerTool(
+  "get_league_users",
+  {
+    title: "Get Users for Sleeper Fantasy League",
+    description:
+      "Fetches a list of fantasy football users from the Sleeper API for a given league id, this provides metatdata to be combined with the get_league_rosters tool to get a full picture of the existing league. Ask the user for their league id.",
+    inputSchema: {
+      league_id: z.string(),
+    },
+    outputSchema: {
+      users: z.array(
+        z.object({
+          user_id: z.string(),
+          display_name: z.string(),
+          metadata: z.object({
+            team_name: z.string(),
+          })
+        }),
+      ),
+    },
+  },
+  async ({ league_id }) => {
+    console.log(`GET https://api.sleeper.app/v1/league/${league_id}/users`);
+    const response = await fetch(
+      `https://api.sleeper.app/v1/league/${league_id}/users`,
+    );
+
+    if (!response.ok) {
+      // Handle non-200 responses by throwing an error
+      throw new Error(
+        `Failed to fetch fantasy users. HTTP status: ${response.status} ${response.statusText}`,
+      );
+    }
+    // Parse the JSON response
+    const structuredContent = await response.json();
+    // Return the response in the expected tool output format
+    return {
+      content: [
+        {
+          type: "text",
+          text: `${JSON.stringify({ users: structuredContent }, null, 3)}`,
+        },
+      ],
+      structuredContent: { users: structuredContent },
+    };
+  },
+);
+
+server.registerTool(
+  "get_league_matchups",
+  {
+    title: "Get Matchups for Sleeper Fantasy League",
+    description:
+      "Fetches a list of fantasy football matchups from the Sleeper API for a given league id. Rosters with the same matchup_id are going head to head. Ask the user for their league id. The week is provided by get_nfl_state.",
+    inputSchema: {
+      league_id: z.string(),
+      week: z
+        .number()
+        .describe(
+          "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
+        ),
+    },
+    outputSchema: {
+      rosters: z.array(
+        z.object({
+          roster_id: z.number(),
+          starters: z
+            .array(z.string())
+            .describe(
+              "The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
+            ),
+          players: z
+            .array(z.string())
+            .describe(
+              "The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
+            ),
+          matchup_id: z.number(),
+          points: z.number(),
+          players_points: z
+            .record(z.string(), z.number())
+            .describe("A map of Player ID to their current number of points"),
+        }),
+      ),
+    },
+  },
+  async ({ league_id, week }) => {
+    console.log(`https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`);
+    const response = await fetch(
+      `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
     );
 
     if (!response.ok) {
@@ -238,7 +354,7 @@ app.post("/mcp", async (req, res) => {
 const port = parseInt(process.env.PORT || "3000");
 app
   .listen(port, () => {
-    console.log(`Demo MCP Server running on http://localhost:${port}/mcp`);
+    console.log(`Sleeper MCP Server running on http://localhost:${port}/mcp`);
   })
   .on("error", (error) => {
     console.error("Server error:", error);
