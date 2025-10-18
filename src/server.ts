@@ -10,20 +10,95 @@ const server = new McpServer({
   version: "1.0.0",
 });
 
-interface PlayerData {
+//----
+// Types
+//----
+
+type Player = {
   status: string;
   full_name: string;
   team: string;
-}
+};
+
+type User = {
+  user_id: string;
+  username: string;
+  display_name: string;
+  metadata: {
+    team_name: string;
+  };
+};
+
+type Roster = {
+  roster_id: number;
+  owner_id: string; // user_id
+  players: string[]; // player IDs
+  starters: string[]; // player IDs
+  settings: {
+    fpts: number;
+    fpts_decimal: number;
+    fpts_against: number;
+    fpts_against_decimal: number;
+    wins: number;
+    losses: number;
+    ties: number;
+    total_moves: number;
+    waiver_position: number;
+    waiver_budget_used: number;
+  };
+  reserve?: string[];
+  league_id: string;
+};
+
+type MatchupEntry = {
+  roster_id: number;
+  starters: string[];
+  players: string[];
+  points: number;
+  players_points: Record<string, number>; // player id to points score
+  matchup_id: number;
+};
+
+type Matchup = {
+  matchup_id: number;
+  week: number;
+  entries: ScoreBoardEntry[];
+};
+
+type ScoreBoardEntry = {
+  user_name: string;
+  team_name: string;
+  starters: string[];
+  players: string[];
+  total_points: number;
+  players_points: Record<string, number>; // player name to points score
+  starters_points: Record<string, number>; // starters name to points score
+  matchup_id: number;
+};
+
+//----
+// Load Player Data
+//----
 
 const playerNameToId: Map<string, string> = new Map();
 const playerIdToName: Map<string, string> = new Map();
 
-const jsonFilePath = "/tmp/nfl.json";
+const PLAYER_DATA_FILE_PATH = "/tmp/nfl.json";
+const PLAYER_DATA_URL = "https://api.sleeper.app/v1/players/nfl";
 
 try {
-  const rawData = fs.readFileSync(jsonFilePath, "utf-8");
-  const parsedData: Record<string, PlayerData> = JSON.parse(rawData); // Parse and cast to MyData interface
+  if (!fs.existsSync(PLAYER_DATA_FILE_PATH)) {
+    const response = await fetch(PLAYER_DATA_URL);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to fetch NFL data: ${response.status} ${response.statusText}`,
+      );
+    }
+    const data = await response.json();
+    fs.writeFileSync(PLAYER_DATA_FILE_PATH, JSON.stringify(data), "utf-8");
+  }
+  const rawData = fs.readFileSync(PLAYER_DATA_FILE_PATH, "utf-8");
+  const parsedData: Record<string, Player> = JSON.parse(rawData); // Parse and cast to MyData interface
 
   for (const [key, playerData] of Object.entries(parsedData)) {
     playerNameToId.set(playerData.full_name, key);
@@ -31,6 +106,19 @@ try {
   }
 } catch (error) {
   console.error("Error reading or parsing JSON file:", error);
+}
+
+async function callApi(url: string) {
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    // Handle non-200 responses by throwing an error
+    throw new Error(
+      `Failed to fetch data. HTTP status: ${response.status} ${response.statusText}`,
+    );
+  }
+  // Parse the JSON response
+  return await response.json();
 }
 
 // Get NFL State
@@ -58,25 +146,16 @@ server.registerTool(
   },
   async () => {
     console.log(`GET ${NFL_STATE_URL}`);
-    const response = await fetch(NFL_STATE_URL);
-
-    if (!response.ok) {
-      // Handle non-200 responses by throwing an error
-      throw new Error(
-        `Failed to fetch NFL state. HTTP status: ${response.status} ${response.statusText}`,
-      );
-    }
-    // Parse the JSON response
-    const structuredContent = await response.json();
+    const stateResponse = await callApi(NFL_STATE_URL);
     // Return the response in the expected tool output format
     return {
       content: [
         {
           type: "text",
-          text: `${JSON.stringify(structuredContent, null, 2)}`,
+          text: `${JSON.stringify(stateResponse, null, 2)}`,
         },
       ],
-      structuredContent: structuredContent,
+      structuredContent: stateResponse,
     };
   },
 );
@@ -195,27 +274,19 @@ server.registerTool(
   },
   async ({ league_id }) => {
     console.log(`GET https://api.sleeper.app/v1/league/${league_id}/rosters`);
-    const response = await fetch(
+
+    const rostersResponse = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/rosters`,
     );
 
-    if (!response.ok) {
-      // Handle non-200 responses by throwing an error
-      throw new Error(
-        `Failed to fetch fantasy rosters. HTTP status: ${response.status} ${response.statusText}`,
-      );
-    }
-    // Parse the JSON response
-    const structuredContent = await response.json();
-    // Return the response in the expected tool output format
     return {
       content: [
         {
           type: "text",
-          text: `${JSON.stringify({ rosters: structuredContent }, null, 3)}`,
+          text: `${JSON.stringify({ rosters: rostersResponse }, null, 3)}`,
         },
       ],
-      structuredContent: { rosters: structuredContent },
+      structuredContent: { rosters: rostersResponse },
     };
   },
 );
@@ -236,34 +307,25 @@ server.registerTool(
           display_name: z.string(),
           metadata: z.object({
             team_name: z.string(),
-          })
+          }),
         }),
       ),
     },
   },
   async ({ league_id }) => {
     console.log(`GET https://api.sleeper.app/v1/league/${league_id}/users`);
-    const response = await fetch(
+    const usersResponse = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/users`,
     );
 
-    if (!response.ok) {
-      // Handle non-200 responses by throwing an error
-      throw new Error(
-        `Failed to fetch fantasy users. HTTP status: ${response.status} ${response.statusText}`,
-      );
-    }
-    // Parse the JSON response
-    const structuredContent = await response.json();
-    // Return the response in the expected tool output format
     return {
       content: [
         {
           type: "text",
-          text: `${JSON.stringify({ users: structuredContent }, null, 3)}`,
+          text: `${JSON.stringify({ users: usersResponse }, null, 3)}`,
         },
       ],
-      structuredContent: { users: structuredContent },
+      structuredContent: { users: usersResponse },
     };
   },
 );
@@ -306,28 +368,136 @@ server.registerTool(
     },
   },
   async ({ league_id, week }) => {
-    console.log(`https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`);
-    const response = await fetch(
+    console.log(
+      `GET https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
+    );
+    const matchupResponse = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
     );
 
-    if (!response.ok) {
-      // Handle non-200 responses by throwing an error
-      throw new Error(
-        `Failed to fetch fantasy rosters. HTTP status: ${response.status} ${response.statusText}`,
-      );
+    return {
+      content: [
+        {
+          type: "text",
+          text: `${JSON.stringify({ rosters: matchupResponse }, null, 3)}`,
+        },
+      ],
+      structuredContent: { rosters: matchupResponse },
+    };
+  },
+);
+
+//---------
+// Rich tools
+//---------
+server.registerTool(
+  "get_matchup_scoreboard",
+  {
+    title: "Get current weeks matchups and scores for a Sleeper Fantasy League",
+    description:
+      "Fetches a list of fantasy football matchups and their scores from the Sleeper API for a given league id. Ask the user for their league id. The week is provided by get_nfl_state.",
+    inputSchema: {
+      league_id: z.string(),
+      week: z
+        .number()
+        .describe(
+          "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
+        ),
+    },
+    outputSchema: {
+      scoreboard: z.array(
+        z.object({
+          matchup_id: z.number(),
+          week: z.number(),
+          entries: z.array(
+            z.object({
+              user_name: z.string(),
+              team_name: z.string(),
+              starters: z.array(z.string()),
+              players: z.array(z.string()),
+              total_points: z.number(),
+              players_points: z.record(z.number()),
+              starters_points: z.record(z.number()),
+              matchup_id: z.number(),
+            }),
+          ),
+        }),
+      ),
+    },
+  },
+  async ({ league_id, week }) => {
+    const usersResponse: User[] = await callApi(
+      `https://api.sleeper.app/v1/league/${league_id}/users`,
+    );
+    const usersById: Record<string, User> = {};
+    for (const u of usersResponse) {
+      usersById[u.user_id] = u;
     }
-    // Parse the JSON response
-    const structuredContent = await response.json();
+    const rostersResponse: Roster[] = await callApi(
+      `https://api.sleeper.app/v1/league/${league_id}/rosters`,
+    );
+
+    const rostersById: Record<number, Roster> = {};
+    for (const r of rostersResponse) {
+      rostersById[r.roster_id] = r;
+    }
+
+    const matchupResponse: MatchupEntry[] = await callApi(
+      `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
+    );
+
+    // Group entries into matchups by matchup_id
+    const grouped: Record<number, ScoreBoardEntry[]> = {};
+    for (const e of matchupResponse) {
+      let matchupGroup = grouped[e.matchup_id];
+      if (!matchupGroup) {
+        matchupGroup = [];
+        grouped[e.matchup_id] = matchupGroup;
+      }
+      let roster = rostersById[e.roster_id];
+      let user = usersById[roster?.owner_id || ""];
+      let score: ScoreBoardEntry = {
+        user_name: user?.display_name || "",
+        team_name: user?.metadata.team_name || "",
+        starters: e.starters.map((id) => playerIdToName.get(id) || id),
+        players: e.players.map((id) => playerIdToName.get(id) || id),
+        total_points: e.points,
+        players_points: Object.fromEntries(
+          Object.entries(e.players_points).map(([id, points]) => [
+            playerIdToName.get(id) || id,
+            points,
+          ]),
+        ),
+        starters_points: Object.fromEntries(
+          Object.entries(e.players_points)
+            .filter(([id, _]) => e.starters.includes(id))
+            .map(([id, points]) => [playerIdToName.get(id) || id, points]),
+        ),
+        matchup_id: e.matchup_id,
+      };
+
+      matchupGroup.push(score);
+    }
+
+    const matchupList: Matchup[] = [];
+    for (const mIdStr of Object.keys(grouped)) {
+      const mId = parseInt(mIdStr, 10);
+      matchupList.push({
+        matchup_id: mId,
+        week: week,
+        entries: grouped[mId] || [],
+      });
+    }
+
     // Return the response in the expected tool output format
     return {
       content: [
         {
           type: "text",
-          text: `${JSON.stringify({ rosters: structuredContent }, null, 3)}`,
+          text: `${JSON.stringify({ scoreboard: matchupList }, null, 5)}`,
         },
       ],
-      structuredContent: { rosters: structuredContent },
+      structuredContent: { scoreboard: matchupList },
     };
   },
 );
