@@ -3,6 +3,17 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import express from "express";
 import { z } from "zod";
 import * as fs from "fs";
+import { LRUCache } from "lru-cache";
+
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
+
+const cache = new LRUCache<string, CacheEntry>({
+  max: 1000,
+  ttl: 30 * 1000,
+});
 
 // Create an MCP server
 const server = new McpServer({
@@ -109,16 +120,24 @@ try {
 }
 
 async function callApi(url: string) {
+  const cached = cache.get(url);
+  if (cached) {
+    console.log(`CACHED ${url}`);
+    return cached.data;
+  }
+  console.log(`GET ${url}`);
   const response = await fetch(url);
 
   if (!response.ok) {
-    // Handle non-200 responses by throwing an error
     throw new Error(
       `Failed to fetch data. HTTP status: ${response.status} ${response.statusText}`,
     );
   }
-  // Parse the JSON response
-  return await response.json();
+  const data = await response.json();
+
+  cache.set(url, { data, timestamp: Date.now() });
+
+  return data;
 }
 
 // Get NFL State
@@ -145,7 +164,6 @@ server.registerTool(
     },
   },
   async () => {
-    console.log(`GET ${NFL_STATE_URL}`);
     const stateResponse = await callApi(NFL_STATE_URL);
     // Return the response in the expected tool output format
     return {
@@ -273,8 +291,6 @@ server.registerTool(
     },
   },
   async ({ league_id }) => {
-    console.log(`GET https://api.sleeper.app/v1/league/${league_id}/rosters`);
-
     const rostersResponse = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/rosters`,
     );
@@ -313,7 +329,6 @@ server.registerTool(
     },
   },
   async ({ league_id }) => {
-    console.log(`GET https://api.sleeper.app/v1/league/${league_id}/users`);
     const usersResponse = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/users`,
     );
@@ -368,9 +383,6 @@ server.registerTool(
     },
   },
   async ({ league_id, week }) => {
-    console.log(
-      `GET https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
-    );
     const matchupResponse = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
     );
