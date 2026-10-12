@@ -4,17 +4,15 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import express from "express";
 import { z } from "zod";
 import * as fs from "fs";
-import { LRUCache } from "lru-cache";
+import { createApiClient } from "./api.js";
+import {
+  buildScoreboard,
+  type Roster,
+  type User,
+  type MatchupEntry,
+} from "./scoreboard.js";
 
-interface CacheEntry {
-  data: any;
-  timestamp: number;
-}
-
-const cache = new LRUCache<string, CacheEntry>({
-  max: 1000,
-  ttl: 30 * 1000,
-});
+const callApi = createApiClient();
 
 // Create an MCP server
 const server = new McpServer({
@@ -30,62 +28,6 @@ type Player = {
   status: string;
   full_name: string;
   team: string;
-};
-
-type User = {
-  user_id: string;
-  username: string;
-  display_name: string;
-  metadata: {
-    team_name: string;
-  };
-};
-
-type Roster = {
-  roster_id: number;
-  owner_id: string; // user_id
-  players: string[]; // player IDs
-  starters: string[]; // player IDs
-  settings: {
-    fpts: number;
-    fpts_decimal: number;
-    fpts_against: number;
-    fpts_against_decimal: number;
-    wins: number;
-    losses: number;
-    ties: number;
-    total_moves: number;
-    waiver_position: number;
-    waiver_budget_used: number;
-  };
-  reserve?: string[];
-  league_id: string;
-};
-
-type MatchupEntry = {
-  roster_id: number;
-  starters: string[];
-  players: string[];
-  points: number;
-  players_points: Record<string, number>; // player id to points score
-  matchup_id: number;
-};
-
-type Matchup = {
-  matchup_id: number;
-  week: number;
-  entries: ScoreBoardEntry[];
-};
-
-type ScoreBoardEntry = {
-  user_name: string;
-  team_name: string;
-  starters: string[];
-  players: string[];
-  total_points: number;
-  players_points: Record<string, number>; // player name to points score
-  starters_points: Record<string, number>; // starters name to points score
-  matchup_id: number;
 };
 
 //----
@@ -118,27 +60,6 @@ try {
   }
 } catch (error) {
   console.error("Error reading or parsing JSON file:", error);
-}
-
-async function callApi(url: string) {
-  const cached = cache.get(url);
-  if (cached) {
-    console.log(`CACHED ${url}`);
-    return cached.data;
-  }
-  console.log(`GET ${url}`);
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch data. HTTP status: ${response.status} ${response.statusText}`,
-    );
-  }
-  const data = await response.json();
-
-  cache.set(url, { data, timestamp: Date.now() });
-
-  return data;
 }
 
 // Get NFL State
@@ -442,65 +363,20 @@ server.registerTool(
     const usersResponse: User[] = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/users`,
     );
-    const usersById: Record<string, User> = {};
-    for (const u of usersResponse) {
-      usersById[u.user_id] = u;
-    }
     const rostersResponse: Roster[] = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/rosters`,
     );
-
-    const rostersById: Record<number, Roster> = {};
-    for (const r of rostersResponse) {
-      rostersById[r.roster_id] = r;
-    }
-
     const matchupResponse: MatchupEntry[] = await callApi(
       `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
     );
 
-    // Group entries into matchups by matchup_id
-    const grouped: Record<number, ScoreBoardEntry[]> = {};
-    for (const e of matchupResponse) {
-      let matchupGroup = grouped[e.matchup_id];
-      if (!matchupGroup) {
-        matchupGroup = [];
-        grouped[e.matchup_id] = matchupGroup;
-      }
-      let roster = rostersById[e.roster_id];
-      let user = usersById[roster?.owner_id || ""];
-      let score: ScoreBoardEntry = {
-        user_name: user?.display_name || "",
-        team_name: user?.metadata.team_name || "",
-        starters: e.starters.map((id) => playerIdToName.get(id) || id),
-        players: e.players.map((id) => playerIdToName.get(id) || id),
-        total_points: e.points,
-        players_points: Object.fromEntries(
-          Object.entries(e.players_points).map(([id, points]) => [
-            playerIdToName.get(id) || id,
-            points,
-          ]),
-        ),
-        starters_points: Object.fromEntries(
-          Object.entries(e.players_points)
-            .filter(([id, _]) => e.starters.includes(id))
-            .map(([id, points]) => [playerIdToName.get(id) || id, points]),
-        ),
-        matchup_id: e.matchup_id,
-      };
-
-      matchupGroup.push(score);
-    }
-
-    const matchupList: Matchup[] = [];
-    for (const mIdStr of Object.keys(grouped)) {
-      const mId = parseInt(mIdStr, 10);
-      matchupList.push({
-        matchup_id: mId,
-        week: week,
-        entries: grouped[mId] || [],
-      });
-    }
+    const matchupList = buildScoreboard(
+      usersResponse,
+      rostersResponse,
+      matchupResponse,
+      playerIdToName,
+      week,
+    );
 
     // Return the response in the expected tool output format
     return {
