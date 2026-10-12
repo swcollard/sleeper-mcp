@@ -11,6 +11,15 @@ describe("buildPlayerDirectory", () => {
     expect(nameToId.get("Patrick Mahomes")).toBe("4046");
   });
 
+  it("names team defenses, which have no full_name, from first + last name", () => {
+    const { idToName, nameToId } = buildPlayerDirectory({
+      KC: { first_name: "Kansas City", last_name: "Chiefs" },
+    });
+
+    expect(idToName.get("KC")).toBe("Kansas City Chiefs");
+    expect(nameToId.get("Kansas City Chiefs")).toBe("KC");
+  });
+
   it("skips records with no name", () => {
     const { idToName, nameToId } = buildPlayerDirectory({ X: {} });
 
