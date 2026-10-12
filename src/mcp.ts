@@ -345,21 +345,29 @@ export function createMcpServer({
       },
     },
     async ({ league_id, week }) => {
-      const usersResponse: User[] = await callApi(
-        `https://api.sleeper.app/v1/league/${league_id}/users`,
-      );
-      const rostersResponse: Roster[] = await callApi(
-        `https://api.sleeper.app/v1/league/${league_id}/rosters`,
-      );
-      const matchupResponse: MatchupEntry[] = await callApi(
-        `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
-      );
+      const [usersResponse, rostersResponse, matchupResponse, players]: [
+        User[],
+        Roster[],
+        MatchupEntry[],
+        PlayerDirectory | undefined,
+      ] = await Promise.all([
+        callApi(`https://api.sleeper.app/v1/league/${league_id}/users`),
+        callApi(`https://api.sleeper.app/v1/league/${league_id}/rosters`),
+        callApi(
+          `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
+        ),
+        // Player names are a nicety here; fall back to ids if they can't load
+        getPlayers().catch((error) => {
+          console.error("Error loading player data:", error);
+          return undefined;
+        }),
+      ]);
 
       const matchupList = buildScoreboard(
         usersResponse,
         rostersResponse,
         matchupResponse,
-        (await getPlayers()).idToName,
+        players?.idToName ?? new Map(),
         week,
       );
 
