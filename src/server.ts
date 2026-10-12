@@ -15,7 +15,7 @@ import {
 // Load Player Data
 //----
 
-const PLAYER_DATA_FILE_PATH = "/tmp/nfl.json";
+const PLAYER_DATA_FILE_PATH = process.env.PLAYER_DATA_FILE || "/tmp/nfl.json";
 
 async function loadPlayers(): Promise<PlayerDirectory> {
   try {

@@ -6,6 +6,8 @@ Typescript MCP Server implementation for Sleeper Fantasy Football API
 1. Clone repo
 2. `npm install` for dependencies
 3. `npm run build` to build typescript
-4. `npm start` to start the MCP server on port 3000
+4. `npm start` to start the MCP server on port 3000 (set `PORT` to change it)
 
-Then point your MCP Client at the server and make requests. Note: this server downloads a file to `/tmp/nfl.json` so it requires read/write access to the directory.
+Then point your MCP Client at `http://localhost:3000/mcp` and make requests.
+
+On startup the server downloads Sleeper's player list to `/tmp/nfl.json` (or the path in `PLAYER_DATA_FILE`), so it needs read/write access to that location. Delete the file to pick up new players.
