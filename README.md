@@ -14,6 +14,13 @@ Then point your MCP Client at `http://localhost:3000/mcp` and make requests.
 
 On startup the server downloads Sleeper's player list to `/tmp/nfl.json` (or the path in `PLAYER_DATA_FILE`), so it needs read/write access to that location. Delete the file to pick up new players.
 
+### Docker
+
+```sh
+docker build -t sleeper-mcp .
+docker run -p 3000:3000 sleeper-mcp
+```
+
 ## Cloudflare Worker
 
 The Worker entry point is `src/worker.ts`, configured in `wrangler.jsonc`.
