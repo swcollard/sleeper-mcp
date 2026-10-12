@@ -4,9 +4,11 @@
   "description": "Typescript MCP Server implementation for Sleeper Fantasy Football API",
   "type": "module",
   "scripts": {
-    "build": "npx tsc",
+    "build": "tsc",
     "start": "node dist/server.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "worker:dev": "wrangler dev",
+    "worker:deploy": "wrangler deploy"
   },
   "repository": {
     "type": "git",
@@ -20,6 +22,7 @@
   },
   "homepage": "https://github.com/swcollard/sleeper-mcp#readme",
   "dependencies": {
+    "@cfworker/json-schema": "^4.1.1",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "express": "^5.3.0",
     "lru-cache": "^11.5.3",
@@ -29,7 +32,8 @@
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.4"
+    "vitest": "^5.0.4",
+    "wrangler": "^4.149.0"
   },
   "engines": {
     "node": ">=24 <25"

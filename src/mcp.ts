@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { jsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/types.js";
 import { z } from "zod";
 import type { PlayerDirectory } from "./players.js";
 import {
@@ -13,6 +14,8 @@ export type McpServerDeps = {
   callApi: (url: string) => Promise<any>;
   /** Resolves the player id <-> name lookups; may load them lazily. */
   getPlayers: () => Promise<PlayerDirectory>;
+  /** Override the SDK's default (ajv) validator, which Workers can't run. */
+  jsonSchemaValidator?: jsonSchemaValidator;
 };
 
 /**
@@ -23,11 +26,15 @@ export type McpServerDeps = {
 export function createMcpServer({
   callApi,
   getPlayers,
+  jsonSchemaValidator,
 }: McpServerDeps): McpServer {
-  const server = new McpServer({
-    name: "sleeper-mcp-server",
-    version: "1.0.0",
-  });
+  const server = new McpServer(
+    {
+      name: "sleeper-mcp-server",
+      version: "1.0.0",
+    },
+    jsonSchemaValidator ? { jsonSchemaValidator } : {},
+  );
 
   // Get NFL State
   const NFL_STATE_URL = "https://api.sleeper.app/v1/state/nfl";

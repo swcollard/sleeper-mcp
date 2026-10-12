@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sleeper-mcp",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-01",
+  "observability": { "enabled": true }
+
+  // Optional: cache player names in KV so each new isolate doesn't download
+  // Sleeper's full player list. Create one with
+  // `npx wrangler kv namespace create PLAYERS_KV` and paste its id here.
+  // "kv_namespaces": [{ "binding": "PLAYERS_KV", "id": "<namespace id>" }]
+}
