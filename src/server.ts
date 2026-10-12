@@ -35,11 +35,6 @@ async function loadPlayers(): Promise<PlayerDirectory> {
 const players = await loadPlayers();
 const callApi = createApiClient();
 
-const server = createMcpServer({
-  callApi,
-  getPlayers: async () => players,
-});
-
 //----
 // HTTP server
 //----
@@ -48,7 +43,12 @@ const app = express();
 app.use(express.json());
 
 app.post("/mcp", async (req, res) => {
-  // Create a new transport for each request to prevent request ID collisions
+  // Stateless mode: an McpServer can only be connected to one transport at a
+  // time, so concurrent requests each need their own server and transport.
+  const server = createMcpServer({
+    callApi,
+    getPlayers: async () => players,
+  });
   const transport = new StreamableHTTPServerTransport({
     // Omitting sessionIdGenerator runs the transport in stateless mode
     enableJsonResponse: true,
@@ -56,12 +56,24 @@ app.post("/mcp", async (req, res) => {
 
   res.on("close", () => {
     transport.close();
+    server.close();
   });
 
-  // The SDK types `onclose` as optional-or-undefined, which conflicts with
-  // `exactOptionalPropertyTypes`; the cast is safe at runtime.
-  await server.connect(transport as Transport);
-  await transport.handleRequest(req, res, req.body);
+  try {
+    // The SDK types `onclose` as optional-or-undefined, which conflicts with
+    // `exactOptionalPropertyTypes`; the cast is safe at runtime.
+    await server.connect(transport as Transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    console.error("Error handling MCP request:", error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: "2.0",
+        error: { code: -32603, message: "Internal server error" },
+        id: null,
+      });
+    }
+  }
 });
 
 const port = parseInt(process.env.PORT || "3000");

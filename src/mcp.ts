@@ -15,7 +15,11 @@ export type McpServerDeps = {
   getPlayers: () => Promise<PlayerDirectory>;
 };
 
-/** Creates an MCP server with all Sleeper tools registered. */
+/**
+ * Creates an MCP server with all Sleeper tools registered. An McpServer can
+ * only be connected to one transport at a time, so stateless HTTP handlers
+ * must create one per request; callApi and getPlayers carry the shared state.
+ */
 export function createMcpServer({
   callApi,
   getPlayers,
