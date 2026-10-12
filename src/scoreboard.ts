@@ -10,9 +10,9 @@ export type User = {
 
 export type Roster = {
   roster_id: number;
-  owner_id: string; // user_id
-  players: string[]; // player IDs
-  starters: string[]; // player IDs
+  owner_id: string | null; // user_id; null for orphaned teams
+  players: string[] | null; // player IDs; null before the draft
+  starters: string[] | null; // player IDs; null before the draft
   settings: {
     fpts: number;
     fpts_decimal: number;

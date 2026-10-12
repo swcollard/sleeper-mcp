@@ -153,15 +153,20 @@ export function createMcpServer({
             roster_id: z.number(),
             starters: z
               .array(z.string())
+              .nullable()
               .describe(
-                "The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
+                "Null before the draft. The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
               ),
             players: z
               .array(z.string())
+              .nullable()
               .describe(
-                "The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
+                "Null before the draft. The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
               ),
-            owner_id: z.string(),
+            owner_id: z
+              .string()
+              .nullable()
+              .describe("Null if the team has no owner (orphaned)"),
             league_id: z.string(),
             settings: z.object({
               wins: z.number(),

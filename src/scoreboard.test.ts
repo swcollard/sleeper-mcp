@@ -41,7 +41,13 @@ const roster = (roster_id: number, owner_id: string): Roster => ({
   },
 });
 
-const rosters: Roster[] = [roster(1, "u1"), roster(2, "u2"), roster(3, "u3")];
+const rosters: Roster[] = [
+  roster(1, "u1"),
+  roster(2, "u2"),
+  roster(3, "u3"),
+  // orphaned team: Sleeper reports no owner
+  { ...roster(4, "u1"), owner_id: null },
+];
 
 const playerNames = new Map([
   ["p1", "Patrick Mahomes"],
@@ -107,11 +113,14 @@ describe("buildScoreboard", () => {
         entry({ roster_id: 3, matchup_id: 1 }),
         // roster 99 doesn't exist at all
         entry({ roster_id: 99, matchup_id: 1 }),
+        // roster 4 has no owner
+        entry({ roster_id: 4, matchup_id: 1 }),
       ],
       playerNames,
       1,
     );
 
+    expect(matchup?.entries).toHaveLength(3);
     for (const e of matchup?.entries ?? []) {
       expect(e.user_name).toBe("");
       expect(e.team_name).toBe("");
