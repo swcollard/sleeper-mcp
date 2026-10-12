@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "npx tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "vitest run"
   },
   "repository": {
     "type": "git",
@@ -27,7 +28,8 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.4"
   },
   "engines": {
     "node": ">=24 <25"
