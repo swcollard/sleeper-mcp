@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import express from "express";
 import { z } from "zod";
 import * as fs from "fs";
@@ -428,8 +429,8 @@ server.registerTool(
               starters: z.array(z.string()),
               players: z.array(z.string()),
               total_points: z.number(),
-              players_points: z.record(z.number()),
-              starters_points: z.record(z.number()),
+              players_points: z.record(z.string(), z.number()),
+              starters_points: z.record(z.string(), z.number()),
               matchup_id: z.number(),
             }),
           ),
@@ -521,7 +522,7 @@ app.use(express.json());
 app.post("/mcp", async (req, res) => {
   // Create a new transport for each request to prevent request ID collisions
   const transport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
+    // Omitting sessionIdGenerator runs the transport in stateless mode
     enableJsonResponse: true,
   });
 
@@ -529,7 +530,9 @@ app.post("/mcp", async (req, res) => {
     transport.close();
   });
 
-  await server.connect(transport);
+  // The SDK types `onclose` as optional-or-undefined, which conflicts with
+  // `exactOptionalPropertyTypes`; the cast is safe at runtime.
+  await server.connect(transport as Transport);
   await transport.handleRequest(req, res, req.body);
 });
 
