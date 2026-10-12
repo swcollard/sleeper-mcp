@@ -243,9 +243,12 @@ server.registerTool(
         z.object({
           user_id: z.string(),
           display_name: z.string(),
-          metadata: z.object({
-            team_name: z.string(),
-          }),
+          metadata: z
+            .object({
+              team_name: z.string().optional(),
+            })
+            .optional()
+            .describe("Absent, or without team_name, if no team name is set"),
         }),
       ),
     },
@@ -295,7 +298,12 @@ server.registerTool(
             .describe(
               "The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
             ),
-          matchup_id: z.number(),
+          matchup_id: z
+            .number()
+            .nullable()
+            .describe(
+              "Null if the roster has no opponent this week (e.g. eliminated from the playoffs)",
+            ),
           points: z.number(),
           players_points: z
             .record(z.string(), z.number())
@@ -341,7 +349,12 @@ server.registerTool(
     outputSchema: {
       scoreboard: z.array(
         z.object({
-          matchup_id: z.number(),
+          matchup_id: z
+            .number()
+            .nullable()
+            .describe(
+              "Null for the group of rosters with no opponent this week (e.g. eliminated from the playoffs)",
+            ),
           week: z.number(),
           entries: z.array(
             z.object({
@@ -352,7 +365,7 @@ server.registerTool(
               total_points: z.number(),
               players_points: z.record(z.string(), z.number()),
               starters_points: z.record(z.string(), z.number()),
-              matchup_id: z.number(),
+              matchup_id: z.number().nullable(),
             }),
           ),
         }),

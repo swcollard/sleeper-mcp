@@ -168,6 +168,70 @@ describe("buildScoreboard", () => {
     expect(e.total_points).toBe(23.5);
   });
 
+  it("tolerates users with no metadata or no team_name", () => {
+    const sparseUsers: User[] = [
+      { user_id: "u1", username: "alice", display_name: "Alice" },
+      {
+        user_id: "u2",
+        username: "bob",
+        display_name: "Bob",
+        metadata: {},
+      },
+    ];
+
+    const [matchup] = buildScoreboard(
+      sparseUsers,
+      rosters,
+      [
+        entry({ roster_id: 1, matchup_id: 1 }),
+        entry({ roster_id: 2, matchup_id: 1 }),
+      ],
+      playerNames,
+      1,
+    );
+
+    expect(matchup?.entries.map((e) => [e.user_name, e.team_name])).toEqual([
+      ["Alice", ""],
+      ["Bob", ""],
+    ]);
+  });
+
+  it("orders matchups by matchup_id regardless of input order", () => {
+    const result = buildScoreboard(
+      users,
+      rosters,
+      [
+        entry({ roster_id: 1, matchup_id: 10 }),
+        entry({ roster_id: 2, matchup_id: 2 }),
+        entry({ roster_id: 3, matchup_id: 1 }),
+      ],
+      playerNames,
+      1,
+    );
+
+    expect(result.map((m) => m.matchup_id)).toEqual([1, 2, 10]);
+  });
+
+  it("groups rosters with a null matchup_id together, last, instead of dropping them", () => {
+    const result = buildScoreboard(
+      users,
+      rosters,
+      [
+        entry({ roster_id: 1, matchup_id: null, points: 0 }),
+        entry({ roster_id: 2, matchup_id: 1 }),
+        entry({ roster_id: 3, matchup_id: null, points: 0 }),
+      ],
+      playerNames,
+      15,
+    );
+
+    expect(result.map((m) => m.matchup_id)).toEqual([1, null]);
+    const noOpponent = result[1]!;
+    expect(noOpponent.week).toBe(15);
+    expect(noOpponent.entries.map((e) => e.user_name)).toEqual(["Alice", ""]);
+    expect(noOpponent.entries.every((e) => e.matchup_id === null)).toBe(true);
+  });
+
   it("returns an empty scoreboard when there are no matchup entries", () => {
     expect(buildScoreboard(users, rosters, [], playerNames, 1)).toEqual([]);
   });
