@@ -6,6 +6,12 @@ import { z } from "zod";
 import * as fs from "fs";
 import { createApiClient } from "./api.js";
 import {
+  buildPlayerDirectory,
+  fetchPlayers,
+  type Player,
+  type PlayerDirectory,
+} from "./players.js";
+import {
   buildScoreboard,
   type Roster,
   type User,
@@ -21,46 +27,27 @@ const server = new McpServer({
 });
 
 //----
-// Types
-//----
-
-type Player = {
-  status: string;
-  full_name: string;
-  team: string;
-};
-
-//----
 // Load Player Data
 //----
 
-const playerNameToId: Map<string, string> = new Map();
-const playerIdToName: Map<string, string> = new Map();
-
 const PLAYER_DATA_FILE_PATH = "/tmp/nfl.json";
-const PLAYER_DATA_URL = "https://api.sleeper.app/v1/players/nfl";
 
-try {
-  if (!fs.existsSync(PLAYER_DATA_FILE_PATH)) {
-    const response = await fetch(PLAYER_DATA_URL);
-    if (!response.ok) {
-      throw new Error(
-        `Failed to fetch NFL data: ${response.status} ${response.statusText}`,
-      );
+async function loadPlayers(): Promise<PlayerDirectory> {
+  try {
+    if (!fs.existsSync(PLAYER_DATA_FILE_PATH)) {
+      const data = await fetchPlayers();
+      fs.writeFileSync(PLAYER_DATA_FILE_PATH, JSON.stringify(data), "utf-8");
     }
-    const data = await response.json();
-    fs.writeFileSync(PLAYER_DATA_FILE_PATH, JSON.stringify(data), "utf-8");
+    const rawData = fs.readFileSync(PLAYER_DATA_FILE_PATH, "utf-8");
+    const parsedData: Record<string, Player> = JSON.parse(rawData);
+    return buildPlayerDirectory(parsedData);
+  } catch (error) {
+    console.error("Error reading or parsing JSON file:", error);
+    return buildPlayerDirectory({});
   }
-  const rawData = fs.readFileSync(PLAYER_DATA_FILE_PATH, "utf-8");
-  const parsedData: Record<string, Player> = JSON.parse(rawData); // Parse and cast to MyData interface
-
-  for (const [key, playerData] of Object.entries(parsedData)) {
-    playerNameToId.set(playerData.full_name, key);
-    playerIdToName.set(key, playerData.full_name);
-  }
-} catch (error) {
-  console.error("Error reading or parsing JSON file:", error);
 }
+
+const players = await loadPlayers();
 
 // Get NFL State
 const NFL_STATE_URL = "https://api.sleeper.app/v1/state/nfl";
@@ -115,7 +102,7 @@ server.registerTool(
   },
   async ({ name }) => {
     console.log(`get_player_id for ${name}`);
-    const id = playerNameToId.get(name);
+    const id = players.nameToId.get(name);
 
     if (!id) {
       // Handle not found error
@@ -150,7 +137,7 @@ server.registerTool(
   },
   async ({ id }) => {
     console.log(`get_player_name for ${id}`);
-    const name = playerIdToName.get(id);
+    const name = players.idToName.get(id);
 
     if (!name) {
       // Handle not found error
@@ -387,7 +374,7 @@ server.registerTool(
       usersResponse,
       rostersResponse,
       matchupResponse,
-      playerIdToName,
+      players.idToName,
       week,
     );
 
