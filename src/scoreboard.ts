@@ -31,8 +31,8 @@ export type Roster = {
 
 export type MatchupEntry = {
   roster_id: number;
-  starters: string[];
-  players: string[];
+  starters: string[] | null; // player IDs; null before the draft
+  players: string[] | null; // player IDs; null before the draft
   points: number;
   players_points: Record<string, number>; // player id to points score
   // null when the roster has no opponent this week (e.g. eliminated in playoffs)
@@ -90,11 +90,13 @@ export function buildScoreboard(
     }
     const roster = rostersById[e.roster_id];
     const user = usersById[roster?.owner_id || ""];
+    const starters = e.starters ?? [];
+    const players = e.players ?? [];
     const score: ScoreBoardEntry = {
       user_name: user?.display_name || "",
       team_name: user?.metadata?.team_name || "",
-      starters: e.starters.map((id) => playerIdToName.get(id) || id),
-      players: e.players.map((id) => playerIdToName.get(id) || id),
+      starters: starters.map((id) => playerIdToName.get(id) || id),
+      players: players.map((id) => playerIdToName.get(id) || id),
       total_points: e.points,
       players_points: Object.fromEntries(
         Object.entries(e.players_points).map(([id, points]) => [
@@ -104,7 +106,7 @@ export function buildScoreboard(
       ),
       starters_points: Object.fromEntries(
         Object.entries(e.players_points)
-          .filter(([id, _]) => e.starters.includes(id))
+          .filter(([id, _]) => starters.includes(id))
           .map(([id, points]) => [playerIdToName.get(id) || id, points]),
       ),
       matchup_id: e.matchup_id,

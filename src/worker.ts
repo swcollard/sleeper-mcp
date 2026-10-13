@@ -38,10 +38,16 @@ async function loadPlayers(
   env: Env,
   fetchFn: typeof fetch,
 ): Promise<PlayerDirectory> {
-  const cached = (await env.PLAYERS_KV?.get(PLAYERS_KV_KEY, "json")) as
-    | Record<string, string>
-    | null
-    | undefined;
+  // KV is only a cache: on any KV error, fall back to Sleeper
+  let cached: Record<string, string> | null | undefined;
+  try {
+    cached = (await env.PLAYERS_KV?.get(PLAYERS_KV_KEY, "json")) as
+      | Record<string, string>
+      | null
+      | undefined;
+  } catch (error) {
+    console.error("Error reading player names from KV:", error);
+  }
   if (cached) {
     return buildPlayerDirectory(
       Object.fromEntries(
@@ -51,11 +57,17 @@ async function loadPlayers(
   }
 
   const players = buildPlayerDirectory(await fetchPlayers(fetchFn));
-  await env.PLAYERS_KV?.put(
-    PLAYERS_KV_KEY,
-    JSON.stringify(Object.fromEntries(players.idToName)),
-    { expirationTtl: PLAYERS_KV_TTL_SECONDS },
-  );
+  try {
+    // Concurrent isolates may race to write this key; KV rate-limits writes
+    // to one per second per key, so a failed put is expected and harmless.
+    await env.PLAYERS_KV?.put(
+      PLAYERS_KV_KEY,
+      JSON.stringify(Object.fromEntries(players.idToName)),
+      { expirationTtl: PLAYERS_KV_TTL_SECONDS },
+    );
+  } catch (error) {
+    console.error("Error writing player names to KV:", error);
+  }
   return players;
 }
 

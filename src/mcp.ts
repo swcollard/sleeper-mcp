@@ -9,6 +9,21 @@ import {
   type MatchupEntry,
 } from "./scoreboard.js";
 
+// Sleeper league ids are numeric strings; restricting the charset keeps model
+// input from rewriting the request path (e.g. "../state/nfl").
+const leagueIdSchema = z
+  .string()
+  .regex(/^[A-Za-z0-9]+$/, "league_id must be alphanumeric");
+
+const weekSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(18)
+  .describe(
+    "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
+  );
+
 export type McpServerDeps = {
   /** Cached JSON GET helper, see createApiClient. */
   callApi: (url: string) => Promise<any>;
@@ -35,6 +50,20 @@ export function createMcpServer({
     },
     jsonSchemaValidator ? { jsonSchemaValidator } : {},
   );
+
+  /**
+   * Fetches a league sub-resource. Sleeper answers an unknown league id with
+   * 200 and a `null` body, so treat that as not found.
+   */
+  const callLeagueApi = async (league_id: string, path: string) => {
+    const data = await callApi(
+      `https://api.sleeper.app/v1/league/${encodeURIComponent(league_id)}/${path}`,
+    );
+    if (data == null) {
+      throw new Error(`Could not find league ${league_id}`);
+    }
+    return data;
+  };
 
   // Get NFL State
   const NFL_STATE_URL = "https://api.sleeper.app/v1/state/nfl";
@@ -152,7 +181,7 @@ export function createMcpServer({
       description:
         "Fetches a list of fantasy football rosters from the Sleeper API for a given league id. Ask the user for their league id.",
       inputSchema: {
-        league_id: z.string(),
+        league_id: leagueIdSchema,
       },
       outputSchema: {
         rosters: z.array(
@@ -174,7 +203,7 @@ export function createMcpServer({
               .string()
               .nullable()
               .describe("Null if the team has no owner (orphaned)"),
-            league_id: z.string(),
+            league_id: leagueIdSchema,
             settings: z.object({
               wins: z.number(),
               waiver_position: z.number(),
@@ -192,9 +221,7 @@ export function createMcpServer({
       },
     },
     async ({ league_id }) => {
-      const rostersResponse = await callApi(
-        `https://api.sleeper.app/v1/league/${league_id}/rosters`,
-      );
+      const rostersResponse = await callLeagueApi(league_id, "rosters");
 
       return {
         content: [
@@ -215,7 +242,7 @@ export function createMcpServer({
       description:
         "Fetches a list of fantasy football users from the Sleeper API for a given league id, this provides metatdata to be combined with the get_league_rosters tool to get a full picture of the existing league. Ask the user for their league id.",
       inputSchema: {
-        league_id: z.string(),
+        league_id: leagueIdSchema,
       },
       outputSchema: {
         users: z.array(
@@ -233,9 +260,7 @@ export function createMcpServer({
       },
     },
     async ({ league_id }) => {
-      const usersResponse = await callApi(
-        `https://api.sleeper.app/v1/league/${league_id}/users`,
-      );
+      const usersResponse = await callLeagueApi(league_id, "users");
 
       return {
         content: [
@@ -256,12 +281,8 @@ export function createMcpServer({
       description:
         "Fetches a list of fantasy football matchups from the Sleeper API for a given league id. Rosters with the same matchup_id are going head to head. Ask the user for their league id. The week is provided by get_nfl_state.",
       inputSchema: {
-        league_id: z.string(),
-        week: z
-          .number()
-          .describe(
-            "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
-          ),
+        league_id: leagueIdSchema,
+        week: weekSchema,
       },
       outputSchema: {
         rosters: z.array(
@@ -269,13 +290,15 @@ export function createMcpServer({
             roster_id: z.number(),
             starters: z
               .array(z.string())
+              .nullable()
               .describe(
-                "The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
+                "Null before the draft. The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
               ),
             players: z
               .array(z.string())
+              .nullable()
               .describe(
-                "The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
+                "Null before the draft. The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
               ),
             matchup_id: z
               .number()
@@ -292,9 +315,7 @@ export function createMcpServer({
       },
     },
     async ({ league_id, week }) => {
-      const matchupResponse = await callApi(
-        `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
-      );
+      const matchupResponse = await callLeagueApi(league_id, `matchups/${week}`);
 
       return {
         content: [
@@ -318,12 +339,8 @@ export function createMcpServer({
       description:
         "Fetches a list of fantasy football matchups and their scores from the Sleeper API for a given league id. Ask the user for their league id. The week is provided by get_nfl_state.",
       inputSchema: {
-        league_id: z.string(),
-        week: z
-          .number()
-          .describe(
-            "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
-          ),
+        league_id: leagueIdSchema,
+        week: weekSchema,
       },
       outputSchema: {
         scoreboard: z.array(
@@ -358,11 +375,9 @@ export function createMcpServer({
         MatchupEntry[],
         PlayerDirectory | undefined,
       ] = await Promise.all([
-        callApi(`https://api.sleeper.app/v1/league/${league_id}/users`),
-        callApi(`https://api.sleeper.app/v1/league/${league_id}/rosters`),
-        callApi(
-          `https://api.sleeper.app/v1/league/${league_id}/matchups/${week}`,
-        ),
+        callLeagueApi(league_id, "users"),
+        callLeagueApi(league_id, "rosters"),
+        callLeagueApi(league_id, `matchups/${week}`),
         // Player names are a nicety here; fall back to ids if they can't load
         getPlayers().catch((error) => {
           console.error("Error loading player data:", error);

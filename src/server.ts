@@ -17,17 +17,25 @@ import {
 
 const PLAYER_DATA_FILE_PATH = process.env.PLAYER_DATA_FILE || "/tmp/nfl.json";
 
+async function readCachedPlayers(): Promise<Record<string, Player>> {
+  if (fs.existsSync(PLAYER_DATA_FILE_PATH)) {
+    return JSON.parse(fs.readFileSync(PLAYER_DATA_FILE_PATH, "utf-8"));
+  }
+  const data = await fetchPlayers();
+  try {
+    fs.writeFileSync(PLAYER_DATA_FILE_PATH, JSON.stringify(data), "utf-8");
+  } catch (error) {
+    // The file is only a cache; keep the data we already fetched
+    console.error("Error writing player data file:", error);
+  }
+  return data;
+}
+
 async function loadPlayers(): Promise<PlayerDirectory> {
   try {
-    if (!fs.existsSync(PLAYER_DATA_FILE_PATH)) {
-      const data = await fetchPlayers();
-      fs.writeFileSync(PLAYER_DATA_FILE_PATH, JSON.stringify(data), "utf-8");
-    }
-    const rawData = fs.readFileSync(PLAYER_DATA_FILE_PATH, "utf-8");
-    const parsedData: Record<string, Player> = JSON.parse(rawData);
-    return buildPlayerDirectory(parsedData);
+    return buildPlayerDirectory(await readCachedPlayers());
   } catch (error) {
-    console.error("Error reading or parsing JSON file:", error);
+    console.error("Error loading player data:", error);
     return buildPlayerDirectory({});
   }
 }

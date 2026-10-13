@@ -241,6 +241,23 @@ describe("buildScoreboard", () => {
     expect(noOpponent.entries.every((e) => e.matchup_id === null)).toBe(true);
   });
 
+  it("treats null starters and players (before the draft) as empty", () => {
+    const [matchup] = buildScoreboard(
+      users,
+      rosters,
+      [entry({ starters: null, players: null, players_points: { p1: 3 } })],
+      playerNames,
+      1,
+    );
+
+    expect(matchup?.entries[0]).toMatchObject({
+      starters: [],
+      players: [],
+      players_points: { "Patrick Mahomes": 3 },
+      starters_points: {},
+    });
+  });
+
   it("returns an empty scoreboard when there are no matchup entries", () => {
     expect(buildScoreboard(users, rosters, [], playerNames, 1)).toEqual([]);
   });

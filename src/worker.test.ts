@@ -10,6 +10,7 @@ const stubSleeper = () =>
   vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.endsWith("/players/nfl")) return Response.json(PLAYERS);
+    if (url.includes("/league/missing/")) return Response.json(null);
     if (url.endsWith("/users")) {
       return Response.json([{ user_id: "u1", display_name: "Alice" }]);
     }
@@ -130,6 +131,66 @@ describe("worker fetch handler", () => {
     ).json();
 
     expect(body.result.structuredContent).toEqual({ player_id: "KC" });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Sleeper when KV reads and writes fail", async () => {
+    const kv = {
+      get: vi.fn().mockRejectedValue(new Error("KV unavailable")),
+      put: vi.fn().mockRejectedValue(new Error("429 Too Many Requests")),
+    };
+    const fetchFn = stubSleeper();
+    const handle = createFetchHandler({ fetchFn });
+
+    const body = await (
+      await handle(callTool(1, "get_player_name", { id: "4046" }), {
+        PLAYERS_KV: kv,
+      })
+    ).json();
+
+    expect(body.result.structuredContent).toEqual({
+      player_name: "Patrick Mahomes",
+    });
+    expect(kv.put).toHaveBeenCalledTimes(1);
+
+    // The loaded directory is kept, so Sleeper isn't asked again
+    await handle(callTool(2, "get_player_name", { id: "KC" }), {
+      PLAYERS_KV: kv,
+    });
+    expect(
+      fetchFn.mock.calls.filter(([url]) => String(url).endsWith("/players/nfl")),
+    ).toHaveLength(1);
+  });
+
+  it("reports an unknown league instead of failing on a null body", async () => {
+    const handle = createFetchHandler({ fetchFn: stubSleeper() });
+
+    for (const [id, name, args] of [
+      [1, "get_league_users", { league_id: "missing" }],
+      [2, "get_matchup_scoreboard", { league_id: "missing", week: 1 }],
+    ] as const) {
+      const body = await (await handle(callTool(id, name, args))).json();
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0].text).toContain(
+        "Could not find league missing",
+      );
+    }
+  });
+
+  it("rejects league ids and weeks that could rewrite the request", async () => {
+    const fetchFn = stubSleeper();
+    const handle = createFetchHandler({ fetchFn });
+
+    for (const [id, args] of [
+      [1, { league_id: "../../state/nfl?x=", week: 1 }],
+      [2, { league_id: "L1", week: 1.5 }],
+      [3, { league_id: "L1", week: -1 }],
+    ] as const) {
+      const body = await (
+        await handle(callTool(id, "get_league_matchups", args))
+      ).json();
+      expect(body.result?.isError ?? body.error).toBeTruthy();
+    }
     expect(fetchFn).not.toHaveBeenCalled();
   });
 });
