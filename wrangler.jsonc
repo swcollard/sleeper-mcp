@@ -9,4 +9,7 @@
   // Sleeper's full player list. Create one with
   // `npx wrangler kv namespace create PLAYERS_KV` and paste its id here.
   // "kv_namespaces": [{ "binding": "PLAYERS_KV", "id": "<namespace id>" }]
+
+  // Recommended: require an API key with `npx wrangler secret put API_KEY`.
+  // See "API key" in the README.
 }

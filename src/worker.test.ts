@@ -30,10 +30,17 @@ const mcpRequest = (id: number, method: string, params: unknown = {}) =>
 const callTool = (id: number, name: string, args: Record<string, unknown>) =>
   mcpRequest(id, "tools/call", { name, arguments: args });
 
+const withAuth = (request: Request, authorization: string) => {
+  const headers = new Headers(request.headers);
+  headers.set("authorization", authorization);
+  return new Request(request, { headers });
+};
+
 describe("worker fetch handler", () => {
   beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -192,5 +199,58 @@ describe("worker fetch handler", () => {
       expect(body.result?.isError ?? body.error).toBeTruthy();
     }
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  describe("API key", () => {
+    const env = { API_KEY: "secret-1, secret-2" };
+    const listTools = () => mcpRequest(1, "tools/list");
+
+    it("rejects requests without a key", async () => {
+      const handle = createFetchHandler({ fetchFn: stubSleeper() });
+
+      const response = await handle(listTools(), env);
+
+      expect(response.status).toBe(401);
+      expect(response.headers.get("www-authenticate")).toBe("Bearer");
+      expect((await response.json()).error.code).toBe(-32001);
+    });
+
+    it("rejects a wrong key or a non-Bearer scheme", async () => {
+      const handle = createFetchHandler({ fetchFn: stubSleeper() });
+
+      for (const header of ["Bearer nope", "Basic secret-1", "secret-1"]) {
+        const response = await handle(withAuth(listTools(), header), env);
+        expect(response.status, header).toBe(401);
+      }
+    });
+
+    it("accepts any of the configured keys", async () => {
+      const handle = createFetchHandler({ fetchFn: stubSleeper() });
+
+      for (const key of ["secret-1", "secret-2"]) {
+        const response = await handle(
+          withAuth(listTools(), `Bearer ${key}`),
+          env,
+        );
+        expect(response.status, key).toBe(200);
+        expect((await response.json()).result.tools.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("rejects before touching Sleeper", async () => {
+      const fetchFn = stubSleeper();
+      const handle = createFetchHandler({ fetchFn });
+
+      await handle(callTool(1, "get_player_name", { id: "4046" }), env);
+
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it("accepts all requests when API_KEY is unset", async () => {
+      const handle = createFetchHandler({ fetchFn: stubSleeper() });
+
+      expect((await handle(listTools(), {})).status).toBe(200);
+      expect((await handle(listTools(), { API_KEY: " , " })).status).toBe(200);
+    });
   });
 });
