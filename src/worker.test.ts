@@ -30,11 +30,13 @@ const mcpRequest = (id: number, method: string, params: unknown = {}) =>
 const callTool = (id: number, name: string, args: Record<string, unknown>) =>
   mcpRequest(id, "tools/call", { name, arguments: args });
 
-const withAuth = (request: Request, authorization: string) => {
+const withHeader = (request: Request, name: string, value: string) => {
   const headers = new Headers(request.headers);
-  headers.set("authorization", authorization);
+  headers.set(name, value);
   return new Request(request, { headers });
 };
+const withAuth = (request: Request, authorization: string) =>
+  withHeader(request, "authorization", authorization);
 
 describe("worker fetch handler", () => {
   beforeEach(() => {
@@ -235,6 +237,22 @@ describe("worker fetch handler", () => {
         expect(response.status, key).toBe(200);
         expect((await response.json()).result.tools.length).toBeGreaterThan(0);
       }
+    });
+
+    it("accepts the key in an x-api-key header", async () => {
+      const handle = createFetchHandler({ fetchFn: stubSleeper() });
+
+      const ok = await handle(
+        withHeader(listTools(), "x-api-key", "secret-2"),
+        env,
+      );
+      const wrong = await handle(
+        withHeader(listTools(), "x-api-key", "nope"),
+        env,
+      );
+
+      expect(ok.status).toBe(200);
+      expect(wrong.status).toBe(401);
     });
 
     it("rejects before touching Sleeper", async () => {

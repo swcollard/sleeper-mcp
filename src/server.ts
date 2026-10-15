@@ -59,7 +59,7 @@ const app = express();
 app.use("/mcp", async (req, res, next) => {
   if (
     apiKeys.length === 0 ||
-    (await isAuthorized(req.get("authorization"), apiKeys))
+    (await isAuthorized((name) => req.get(name), apiKeys))
   ) {
     next();
     return;

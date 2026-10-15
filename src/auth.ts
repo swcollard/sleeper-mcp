@@ -15,19 +15,35 @@ const sha256 = async (value: string) =>
     await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
   );
 
+/** Looks up a request header by lowercase name. */
+export type GetHeader = (name: string) => string | null | undefined;
+
 /**
- * Checks an `Authorization: Bearer <key>` header against the allowed keys.
- * Compares fixed-length hashes in constant time, and checks every key, so
- * response timing doesn't reveal how much of a key matched.
+ * Returns the API key a request sent: the `x-api-key` header if present,
+ * otherwise the token from `Authorization: Bearer <key>`. x-api-key wins so
+ * that a client can send it alongside an unrelated Authorization header.
+ */
+export function getProvidedApiKey(getHeader: GetHeader): string | undefined {
+  const apiKey = getHeader("x-api-key")?.trim();
+  if (apiKey) return apiKey;
+  const authorization = getHeader("authorization")?.trim() ?? "";
+  const match = /^Bearer\s+(.+)$/i.exec(authorization);
+  return match?.[1]?.trim() || undefined;
+}
+
+/**
+ * Checks the request's API key (see getProvidedApiKey) against the allowed
+ * keys. Compares fixed-length hashes in constant time, and checks every key,
+ * so response timing doesn't reveal how much of a key matched.
  */
 export async function isAuthorized(
-  authorizationHeader: string | null | undefined,
+  getHeader: GetHeader,
   apiKeys: readonly string[],
 ): Promise<boolean> {
-  const match = /^Bearer\s+(.+)$/i.exec(authorizationHeader?.trim() ?? "");
-  if (!match?.[1]) return false;
+  const providedKey = getProvidedApiKey(getHeader);
+  if (!providedKey) return false;
 
-  const provided = await sha256(match[1].trim());
+  const provided = await sha256(providedKey);
   let authorized = false;
   for (const key of apiKeys) {
     const expected = await sha256(key);
@@ -42,6 +58,10 @@ export async function isAuthorized(
 
 export const UNAUTHORIZED_BODY = {
   jsonrpc: "2.0",
-  error: { code: -32001, message: "Unauthorized: missing or invalid API key" },
+  error: {
+    code: -32001,
+    message:
+      "Unauthorized: missing or invalid API key. Send it in an x-api-key header or as Authorization: Bearer <key>.",
+  },
   id: null,
 } as const;
