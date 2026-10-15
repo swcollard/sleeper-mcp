@@ -1,0 +1,7 @@
+{
+  // Type-checks everything, tests included; `npm run build` uses tsconfig.json,
+  // which leaves tests out of dist.
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "noEmit": true },
+  "exclude": ["node_modules", "dist"]
+}

@@ -6,7 +6,11 @@ import { isAuthorized, parseApiKeys, UNAUTHORIZED_BODY } from "./auth.js";
 import { createMcpServer } from "./mcp.js";
 import {
   buildPlayerDirectory,
+  createPlayerCache,
   fetchPlayers,
+  PLAYER_DATA_MAX_AGE_MS,
+  slimPlayers,
+  type Player,
   type PlayerDirectory,
 } from "./players.js";
 
@@ -22,7 +26,7 @@ type KVNamespaceLike = {
 
 export type Env = {
   /**
-   * Optional KV namespace for caching player names across isolates. Without
+   * Optional KV namespace for caching player data across isolates. Without
    * it, each isolate downloads Sleeper's player list on first use.
    */
   PLAYERS_KV?: KVNamespaceLike;
@@ -32,48 +36,60 @@ export type Env = {
    * When unset, the server accepts all requests.
    */
   API_KEY?: string;
+  /**
+   * League the league tools use when called without a league_id. A client's
+   * `?league_id=` query parameter on the MCP URL takes precedence.
+   */
+  DEFAULT_LEAGUE_ID?: string;
 };
 
-const PLAYERS_KV_KEY = "players:id-to-name";
-const PLAYERS_KV_TTL_SECONDS = 24 * 60 * 60;
+// Bump the version whenever the stored shape changes, so new code never reads
+// an old copy
+const PLAYERS_KV_KEY = "players:v2";
+const PLAYERS_KV_TTL_SECONDS = PLAYER_DATA_MAX_AGE_MS / 1000;
+
+type CachedPlayers = {
+  /** When the data was downloaded from Sleeper, in ms since the epoch */
+  fetched_at: number;
+  players: Record<string, Player>;
+};
 
 /**
- * Loads player names, preferring the KV copy. Only id -> name is stored in KV
- * so later isolates parse a few hundred KB instead of the full player list.
+ * Loads players, preferring the KV copy. KV holds a slim copy (see
+ * slimPlayers) so later isolates parse much less than the full player list.
  */
 async function loadPlayers(
   env: Env,
   fetchFn: typeof fetch,
+  now: () => number,
 ): Promise<PlayerDirectory> {
   // KV is only a cache: on any KV error, fall back to Sleeper
-  let cached: Record<string, string> | null | undefined;
+  let cached: CachedPlayers | null | undefined;
   try {
     cached = (await env.PLAYERS_KV?.get(PLAYERS_KV_KEY, "json")) as
-      | Record<string, string>
+      | CachedPlayers
       | null
       | undefined;
   } catch (error) {
-    console.error("Error reading player names from KV:", error);
+    console.error("Error reading player data from KV:", error);
   }
   if (cached) {
-    return buildPlayerDirectory(
-      Object.fromEntries(
-        Object.entries(cached).map(([id, full_name]) => [id, { full_name }]),
-      ),
-    );
+    return buildPlayerDirectory(cached.players, cached.fetched_at);
   }
 
-  const players = buildPlayerDirectory(await fetchPlayers(fetchFn));
+  const players = buildPlayerDirectory(await fetchPlayers(fetchFn), now());
   try {
     // Concurrent isolates may race to write this key; KV rate-limits writes
     // to one per second per key, so a failed put is expected and harmless.
-    await env.PLAYERS_KV?.put(
-      PLAYERS_KV_KEY,
-      JSON.stringify(Object.fromEntries(players.idToName)),
-      { expirationTtl: PLAYERS_KV_TTL_SECONDS },
-    );
+    const value: CachedPlayers = {
+      fetched_at: players.fetchedAt,
+      players: slimPlayers(players),
+    };
+    await env.PLAYERS_KV?.put(PLAYERS_KV_KEY, JSON.stringify(value), {
+      expirationTtl: PLAYERS_KV_TTL_SECONDS,
+    });
   } catch (error) {
-    console.error("Error writing player names to KV:", error);
+    console.error("Error writing player data to KV:", error);
   }
   return players;
 }
@@ -86,21 +102,22 @@ const jsonRpcError = (status: number, code: number, message: string) =>
 
 /**
  * Creates the Worker's fetch handler. Module-level state (API cache, player
- * names) lives as long as the isolate and is shared across requests.
+ * data) lives as long as the isolate and is shared across requests.
  */
 export function createFetchHandler({
   fetchFn = fetch,
-}: { fetchFn?: typeof fetch } = {}) {
+  now = Date.now,
+}: { fetchFn?: typeof fetch; now?: () => number } = {}) {
   const callApi = createApiClient({ fetchFn });
   const jsonSchemaValidator = new CfWorkerJsonSchemaValidator();
-  let playersPromise: Promise<PlayerDirectory> | undefined;
+  let getPlayers: (() => Promise<PlayerDirectory>) | undefined;
   let warnedNoApiKey = false;
 
   return async function handleFetch(
     request: Request,
     env: Env = {},
   ): Promise<Response> {
-    const { pathname } = new URL(request.url);
+    const { pathname, searchParams } = new URL(request.url);
     if (pathname !== "/mcp") {
       return new Response("Not Found", { status: 404 });
     }
@@ -123,20 +140,19 @@ export function createFetchHandler({
       return jsonRpcError(405, -32000, "Method not allowed.");
     }
 
-    const getPlayers = () => {
-      playersPromise ??= loadPlayers(env, fetchFn).catch((error) => {
-        // Let the next call retry rather than caching the failure
-        playersPromise = undefined;
-        throw error;
-      });
-      return playersPromise;
-    };
+    // An isolate serves a single Worker, so env is the same on every request
+    getPlayers ??= createPlayerCache(() => loadPlayers(env, fetchFn, now), {
+      now,
+    });
 
     // Stateless mode: a fresh server and transport per request
     const server = createMcpServer({
       callApi,
       getPlayers,
       jsonSchemaValidator,
+      // Each client can pick its league in the URL it connects to
+      defaultLeagueId:
+        searchParams.get("league_id") || env.DEFAULT_LEAGUE_ID || undefined,
     });
     const transport = new WebStandardStreamableHTTPServerTransport({
       enableJsonResponse: true,

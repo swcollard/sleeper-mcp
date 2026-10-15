@@ -1,43 +1,6 @@
-export type User = {
-  user_id: string;
-  username: string;
-  display_name: string;
-  // Sleeper omits metadata, or team_name within it, when no team name is set
-  metadata?: {
-    team_name?: string;
-  };
-};
+import type { MatchupEntry, Roster, User } from "./sleeper.js";
 
-export type Roster = {
-  roster_id: number;
-  owner_id: string | null; // user_id; null for orphaned teams
-  players: string[] | null; // player IDs; null before the draft
-  starters: string[] | null; // player IDs; null before the draft
-  settings: {
-    fpts: number;
-    fpts_decimal: number;
-    fpts_against: number;
-    fpts_against_decimal: number;
-    wins: number;
-    losses: number;
-    ties: number;
-    total_moves: number;
-    waiver_position: number;
-    waiver_budget_used: number;
-  };
-  reserve?: string[];
-  league_id: string;
-};
-
-export type MatchupEntry = {
-  roster_id: number;
-  starters: string[] | null; // player IDs; null before the draft
-  players: string[] | null; // player IDs; null before the draft
-  points: number;
-  players_points: Record<string, number>; // player id to points score
-  // null when the roster has no opponent this week (e.g. eliminated in playoffs)
-  matchup_id: number | null;
-};
+export type { MatchupEntry, Roster, User };
 
 export type Matchup = {
   matchup_id: number | null;
