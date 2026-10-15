@@ -3,6 +3,7 @@ import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import express from "express";
 import * as fs from "fs";
 import { createApiClient } from "./api.js";
+import { isAuthorized, parseApiKeys, UNAUTHORIZED_BODY } from "./auth.js";
 import { createMcpServer } from "./mcp.js";
 import {
   buildPlayerDirectory,
@@ -47,7 +48,25 @@ const callApi = createApiClient();
 // HTTP server
 //----
 
+const apiKeys = parseApiKeys(process.env.API_KEY);
+if (apiKeys.length === 0) {
+  console.warn("API_KEY is not set; accepting unauthenticated requests");
+}
+
 const app = express();
+
+// Checked before parsing the body, so unauthenticated requests do no work
+app.use("/mcp", async (req, res, next) => {
+  if (
+    apiKeys.length === 0 ||
+    (await isAuthorized(req.get("authorization"), apiKeys))
+  ) {
+    next();
+    return;
+  }
+  res.status(401).set("WWW-Authenticate", "Bearer").json(UNAUTHORIZED_BODY);
+});
+
 app.use(express.json());
 
 app.post("/mcp", async (req, res) => {

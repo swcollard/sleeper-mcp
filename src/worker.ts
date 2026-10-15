@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
 import { createApiClient } from "./api.js";
+import { isAuthorized, parseApiKeys, UNAUTHORIZED_BODY } from "./auth.js";
 import { createMcpServer } from "./mcp.js";
 import {
   buildPlayerDirectory,
@@ -25,6 +26,12 @@ export type Env = {
    * it, each isolate downloads Sleeper's player list on first use.
    */
   PLAYERS_KV?: KVNamespaceLike;
+  /**
+   * Comma-separated API keys; requests must send one as
+   * `Authorization: Bearer <key>`. Set with `wrangler secret put API_KEY`.
+   * When unset, the server accepts all requests.
+   */
+  API_KEY?: string;
 };
 
 const PLAYERS_KV_KEY = "players:id-to-name";
@@ -87,6 +94,7 @@ export function createFetchHandler({
   const callApi = createApiClient({ fetchFn });
   const jsonSchemaValidator = new CfWorkerJsonSchemaValidator();
   let playersPromise: Promise<PlayerDirectory> | undefined;
+  let warnedNoApiKey = false;
 
   return async function handleFetch(
     request: Request,
@@ -95,6 +103,21 @@ export function createFetchHandler({
     const { pathname } = new URL(request.url);
     if (pathname !== "/mcp") {
       return new Response("Not Found", { status: 404 });
+    }
+
+    const apiKeys = parseApiKeys(env.API_KEY);
+    if (apiKeys.length === 0) {
+      if (!warnedNoApiKey) {
+        console.warn("API_KEY is not set; accepting unauthenticated requests");
+        warnedNoApiKey = true;
+      }
+    } else if (
+      !(await isAuthorized(request.headers.get("authorization"), apiKeys))
+    ) {
+      return Response.json(UNAUTHORIZED_BODY, {
+        status: 401,
+        headers: { "WWW-Authenticate": "Bearer" },
+      });
     }
     if (request.method !== "POST") {
       return jsonRpcError(405, -32000, "Method not allowed.");

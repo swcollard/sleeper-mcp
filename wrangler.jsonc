@@ -3,10 +3,19 @@
   "name": "sleeper-mcp",
   "main": "src/worker.ts",
   "compatibility_date": "2026-10-01",
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  // Required by `wrangler preview`, which Cloudflare's Git integration runs
+  // for non-production branches. Bindings and secrets aren't inherited from
+  // production: to give previews KV, add the same kv_namespaces entry inside
+  // this block; set preview secrets with `npx wrangler preview secret put`.
+  "previews": {}
 
   // Optional: cache player names in KV so each new isolate doesn't download
   // Sleeper's full player list. Create one with
   // `npx wrangler kv namespace create PLAYERS_KV` and paste its id here.
   // "kv_namespaces": [{ "binding": "PLAYERS_KV", "id": "<namespace id>" }]
+
+  // Recommended: require an API key with `npx wrangler secret put API_KEY`.
+  // See "API key" in the README.
 }

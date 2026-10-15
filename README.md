@@ -37,6 +37,23 @@ The cached names expire after 24 hours.
 
 Note: the first player lookup in a fresh isolate parses Sleeper's full player list (several MB), which can exceed the Workers Free plan's per-request CPU limit. The Paid plan is recommended; binding KV also helps, since most isolates then read the much smaller cached copy.
 
+## API key
+
+Set `API_KEY` to require clients to send `Authorization: Bearer <key>` with every request; others get a `401`. Without it, the server accepts all requests and logs a warning. To rotate keys without downtime, set several comma-separated keys (`API_KEY=new-key,old-key`), update your clients, then remove the old one.
+
+Generate a key with `openssl rand -hex 32`, then set it:
+
+- **Node:** `API_KEY=<key> npm start`
+- **Docker:** `docker run -p 3000:3000 -e API_KEY=<key> sleeper-mcp`
+- **Cloudflare Worker:** `npx wrangler secret put API_KEY`, or add it as a **Secret** under the Worker's Settings → Variables and Secrets in the Cloudflare dashboard. Secrets persist across deploys. For `npm run worker:dev`, put `API_KEY=<key>` in a `.dev.vars` file (gitignored).
+
+Then configure your MCP client to send the header. For example, with Claude Code:
+
+```sh
+claude mcp add --transport http sleeper https://<your-worker>.workers.dev/mcp \
+  --header "Authorization: Bearer <key>"
+```
+
 ## Development
 
 `npm test` runs the unit tests.
