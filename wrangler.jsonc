@@ -11,11 +11,16 @@
   // this block; set preview secrets with `npx wrangler preview secret put`.
   "previews": {}
 
-  // Optional: cache player names in KV so each new isolate doesn't download
+  // Optional: cache player data in KV so each new isolate doesn't download
   // Sleeper's full player list. Create one with
   // `npx wrangler kv namespace create PLAYERS_KV` and paste its id here.
   // "kv_namespaces": [{ "binding": "PLAYERS_KV", "id": "<namespace id>" }]
 
   // Recommended: require an API key with `npx wrangler secret put API_KEY`.
   // See "API key" in the README.
+
+  // Optional: the league tools use when called without a league_id. Clients
+  // can override it with `?league_id=` on the MCP URL. See "Default league"
+  // in the README.
+  // "vars": { "DEFAULT_LEAGUE_ID": "<league id>" }
 }

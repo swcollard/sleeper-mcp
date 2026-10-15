@@ -1,16 +1,11 @@
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import express from "express";
-import * as fs from "fs";
 import { createApiClient } from "./api.js";
 import { isAuthorized, parseApiKeys, UNAUTHORIZED_BODY } from "./auth.js";
 import { createMcpServer } from "./mcp.js";
-import {
-  buildPlayerDirectory,
-  fetchPlayers,
-  type Player,
-  type PlayerDirectory,
-} from "./players.js";
+import { loadPlayersFromFile } from "./playerFile.js";
+import { createPlayerCache } from "./players.js";
 
 //----
 // Load Player Data
@@ -18,31 +13,19 @@ import {
 
 const PLAYER_DATA_FILE_PATH = process.env.PLAYER_DATA_FILE || "/tmp/nfl.json";
 
-async function readCachedPlayers(): Promise<Record<string, Player>> {
-  if (fs.existsSync(PLAYER_DATA_FILE_PATH)) {
-    return JSON.parse(fs.readFileSync(PLAYER_DATA_FILE_PATH, "utf-8"));
-  }
-  const data = await fetchPlayers();
-  try {
-    fs.writeFileSync(PLAYER_DATA_FILE_PATH, JSON.stringify(data), "utf-8");
-  } catch (error) {
-    // The file is only a cache; keep the data we already fetched
-    console.error("Error writing player data file:", error);
-  }
-  return data;
-}
+// Refreshed in the background once the data is a day old
+const getPlayers = createPlayerCache(() =>
+  loadPlayersFromFile(PLAYER_DATA_FILE_PATH),
+);
+// Load at startup rather than on the first request; on failure, player tools
+// retry the load when called
+getPlayers().catch((error) =>
+  console.error("Error loading player data:", error),
+);
 
-async function loadPlayers(): Promise<PlayerDirectory> {
-  try {
-    return buildPlayerDirectory(await readCachedPlayers());
-  } catch (error) {
-    console.error("Error loading player data:", error);
-    return buildPlayerDirectory({});
-  }
-}
-
-const players = await loadPlayers();
 const callApi = createApiClient();
+
+const DEFAULT_LEAGUE_ID = process.env.DEFAULT_LEAGUE_ID;
 
 //----
 // HTTP server
@@ -72,9 +55,15 @@ app.use(express.json());
 app.post("/mcp", async (req, res) => {
   // Stateless mode: an McpServer can only be connected to one transport at a
   // time, so concurrent requests each need their own server and transport.
+  // Each client can pick its league in the URL it connects to
+  const leagueParam = req.query.league_id;
   const server = createMcpServer({
     callApi,
-    getPlayers: async () => players,
+    getPlayers,
+    defaultLeagueId:
+      (typeof leagueParam === "string" && leagueParam) ||
+      DEFAULT_LEAGUE_ID ||
+      undefined,
   });
   const transport = new StreamableHTTPServerTransport({
     // Omitting sessionIdGenerator runs the transport in stateless mode

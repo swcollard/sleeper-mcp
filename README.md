@@ -12,7 +12,7 @@ The same tools can run two ways: as a standalone Node server, or as a Cloudflare
 
 Then point your MCP Client at `http://localhost:3000/mcp` and make requests.
 
-On startup the server downloads Sleeper's player list to `/tmp/nfl.json` (or the path in `PLAYER_DATA_FILE`), so it needs read/write access to that location. Delete the file to pick up new players.
+On startup the server loads Sleeper's player list from `/tmp/nfl.json` (or the path in `PLAYER_DATA_FILE`), downloading it if the file is missing or more than a day old, so it needs read/write access to that location. While running, it re-downloads the list in the background once a day, which keeps injury statuses current. If Sleeper is unavailable, it keeps using the old copy.
 
 ### Docker
 
@@ -33,7 +33,7 @@ Each Worker isolate downloads the player list the first time a player tool is us
 1. `npx wrangler kv namespace create PLAYERS_KV`
 2. Uncomment `kv_namespaces` in `wrangler.jsonc` and paste in the namespace id.
 
-The cached names expire after 24 hours.
+The cached copy holds only the player fields the tools use, and expires after 24 hours.
 
 Note: the first player lookup in a fresh isolate parses Sleeper's full player list (several MB), which can exceed the Workers Free plan's per-request CPU limit. The Paid plan is recommended; binding KV also helps, since most isolates then read the much smaller cached copy.
 
@@ -57,6 +57,25 @@ Then configure your MCP client to send the key:
     --header "x-api-key: <key>"
   ```
 
+## Default league
+
+League tools take an optional `league_id`. When it's omitted they use, in order:
+
+1. the `league_id` query parameter on the MCP URL, set per client: `http://localhost:3000/mcp?league_id=<id>`
+2. the `DEFAULT_LEAGUE_ID` setting for the whole server
+
+Without either, the model asks the user for their league id. Set `DEFAULT_LEAGUE_ID` like `API_KEY` above: as an environment variable for Node and Docker, or for the Worker as a variable in `wrangler.jsonc` (`"vars": { "DEFAULT_LEAGUE_ID": "<id>" }`) or the Cloudflare dashboard. A shared Worker usually wants the query parameter instead, so each client picks its own league.
+
 ## Development
 
-`npm test` runs the unit tests.
+- `npm test` runs the unit tests.
+- `npm run typecheck` type-checks everything, tests included (`npm run build` leaves tests out).
+
+CI runs both, plus the build and a Worker bundle check (`wrangler deploy --dry-run`), on every pull request.
+
+### Layout
+
+- `src/mcp.ts` creates the MCP server; each module in `src/tools/` registers one group of tools, using the shared helpers in `src/tools/context.ts` (league id handling, Sleeper calls).
+- `src/sleeper.ts` has types for Sleeper API responses.
+- `src/players.ts` builds the player directory (lookups by id and name, and player details) and refreshes it daily; `src/playerFile.ts` is the Node server's file cache of it.
+- `src/server.ts` (Node) and `src/worker.ts` (Cloudflare Worker) are the two entry points.

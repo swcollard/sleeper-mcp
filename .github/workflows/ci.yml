@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR supersedes the running check
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Covers the tests too, which `npm run build` leaves out
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+      # Bundles the Worker without deploying it; needs no Cloudflare login
+      - name: Check the Worker bundles
+        run: npx wrangler deploy --dry-run --outdir dist/worker

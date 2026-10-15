@@ -55,9 +55,9 @@ describe("worker fetch handler", () => {
     expect((await handle(new Request("https://worker.test/"))).status).toBe(
       404,
     );
-    expect(
-      (await handle(new Request("https://worker.test/mcp"))).status,
-    ).toBe(405);
+    expect((await handle(new Request("https://worker.test/mcp"))).status).toBe(
+      405,
+    );
   });
 
   it("serves concurrent requests, each with its own server", async () => {
@@ -80,7 +80,9 @@ describe("worker fetch handler", () => {
     }
     // Player data is loaded once and shared across requests
     expect(
-      fetchFn.mock.calls.filter(([url]) => String(url).endsWith("/players/nfl")),
+      fetchFn.mock.calls.filter(([url]) =>
+        String(url).endsWith("/players/nfl"),
+      ),
     ).toHaveLength(1);
   });
 
@@ -136,7 +138,10 @@ describe("worker fetch handler", () => {
     const fetchFn = stubSleeper();
     const second = createFetchHandler({ fetchFn });
     const body = await (
-      await second(callTool(2, "get_player_id", { name: "Kansas City Chiefs" }), env)
+      await second(
+        callTool(2, "get_player_id", { name: "Kansas City Chiefs" }),
+        env,
+      )
     ).json();
 
     expect(body.result.structuredContent).toEqual({ player_id: "KC" });
@@ -167,7 +172,9 @@ describe("worker fetch handler", () => {
       PLAYERS_KV: kv,
     });
     expect(
-      fetchFn.mock.calls.filter(([url]) => String(url).endsWith("/players/nfl")),
+      fetchFn.mock.calls.filter(([url]) =>
+        String(url).endsWith("/players/nfl"),
+      ),
     ).toHaveLength(1);
   });
 
@@ -201,6 +208,124 @@ describe("worker fetch handler", () => {
       expect(body.result?.isError ?? body.error).toBeTruthy();
     }
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("stores a slim copy of the players in KV", async () => {
+    const kv = {
+      get: vi.fn(async () => null),
+      put: vi.fn(async (_key: string, _value: string) => {}),
+    };
+    const handle = createFetchHandler({
+      fetchFn: stubSleeper(),
+      now: () => 42,
+    });
+
+    await handle(callTool(1, "get_player_name", { id: "KC" }), {
+      PLAYERS_KV: kv,
+    });
+
+    expect(kv.put).toHaveBeenCalledWith(
+      "players:v2",
+      expect.any(String),
+      expect.objectContaining({ expirationTtl: 86400 }),
+    );
+    expect(JSON.parse(kv.put.mock.calls[0]![1])).toEqual({
+      fetched_at: 42,
+      players: {
+        "4046": { full_name: "Patrick Mahomes" },
+        KC: { full_name: "Kansas City Chiefs" },
+      },
+    });
+  });
+
+  describe("default league", () => {
+    const leagueUrls = (fetchFn: ReturnType<typeof stubSleeper>) =>
+      fetchFn.mock.calls
+        .map(([url]) => String(url))
+        .filter((url) => url.includes("/league/"));
+
+    const usersOf = async (
+      request: Request,
+      env: Record<string, string> = {},
+    ) => {
+      const fetchFn = stubSleeper();
+      const handle = createFetchHandler({ fetchFn });
+      const body = await (await handle(request, env)).json();
+      return { body, urls: leagueUrls(fetchFn) };
+    };
+
+    const withQuery = (request: Request, query: string) =>
+      new Request(`${request.url}?${query}`, request);
+
+    it("uses the league_id argument when given", async () => {
+      const { urls } = await usersOf(
+        withQuery(
+          callTool(1, "get_league_users", { league_id: "L1" }),
+          "league_id=Q1",
+        ),
+        { DEFAULT_LEAGUE_ID: "E1" },
+      );
+      expect(urls).toEqual(["https://api.sleeper.app/v1/league/L1/users"]);
+    });
+
+    it("falls back to the URL's league_id, then DEFAULT_LEAGUE_ID", async () => {
+      const fromQuery = await usersOf(
+        withQuery(callTool(1, "get_league_users", {}), "league_id=Q1"),
+        { DEFAULT_LEAGUE_ID: "E1" },
+      );
+      expect(fromQuery.urls).toEqual([
+        "https://api.sleeper.app/v1/league/Q1/users",
+      ]);
+
+      const fromEnv = await usersOf(callTool(1, "get_league_users", {}), {
+        DEFAULT_LEAGUE_ID: "E1",
+      });
+      expect(fromEnv.urls).toEqual([
+        "https://api.sleeper.app/v1/league/E1/users",
+      ]);
+    });
+
+    it("tells the model to ask for a league when there is no default", async () => {
+      const { body, urls } = await usersOf(
+        callTool(1, "get_matchup_scoreboard", { week: 1 }),
+      );
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0].text).toContain("Ask the user");
+      expect(urls).toEqual([]);
+    });
+
+    it("never uses an invalid default in a request path", async () => {
+      const { body, urls } = await usersOf(
+        withQuery(
+          callTool(1, "get_league_users", {}),
+          "league_id=../state/nfl",
+        ),
+      );
+      expect(body.result.isError).toBe(true);
+      expect(body.result.content[0].text).toContain("is invalid");
+      expect(urls).toEqual([]);
+    });
+
+    it("names the default league in the tool's input description", async () => {
+      const fetchFn = stubSleeper();
+      const handle = createFetchHandler({ fetchFn });
+      const tools = async (env: Record<string, string>) => {
+        const body = await (
+          await handle(mcpRequest(1, "tools/list"), env)
+        ).json();
+        const tool = body.result.tools.find(
+          (t: { name: string }) => t.name === "get_league_users",
+        );
+        return tool.inputSchema;
+      };
+
+      const withDefault = await tools({ DEFAULT_LEAGUE_ID: "E1" });
+      expect(withDefault.required ?? []).not.toContain("league_id");
+      expect(withDefault.properties.league_id.description).toContain("(E1)");
+      expect((await tools({})).properties.league_id.description).toContain(
+        "Ask the user",
+      );
+    });
   });
 
   describe("API key", () => {
