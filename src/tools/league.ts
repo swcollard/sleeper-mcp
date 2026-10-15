@@ -1,8 +1,65 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { leagueDetails } from "../leagues.js";
+import type { League } from "../sleeper.js";
 import { leagueIdSchema, weekSchema, type ToolContext } from "./context.js";
+import { leagueSummaryFields } from "./users.js";
 
 export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
+  server.registerTool(
+    "get_league",
+    {
+      title: "Get Settings for Sleeper Fantasy League",
+      description:
+        "Fetches a fantasy football league's settings from the Sleeper API: its name, season, status, lineup slots, scoring, playoff format, waivers and trade deadline.",
+      inputSchema: {
+        league_id: ctx.leagueIdInput,
+      },
+      outputSchema: {
+        ...leagueSummaryFields,
+        roster_positions: z
+          .array(z.string())
+          .describe(
+            'Lineup slots, e.g. ["QB", "RB", "RB", "WR", "FLEX", "BN"]; BN is the bench, IR injured reserve',
+          ),
+        scoring_settings: z
+          .record(z.string(), z.number())
+          .describe("Points per stat, e.g. { pass_td: 4, rec: 1 }"),
+        playoff_teams: z.number().nullable(),
+        playoff_week_start: z
+          .number()
+          .nullable()
+          .describe("The first week of the playoffs"),
+        waiver_type: z
+          .string()
+          .nullable()
+          .describe(
+            '"rolling", "reverse_standings", "faab" (bidding), or "unknown (N)" for a value Sleeper isn\'t known to use',
+          ),
+        waiver_budget: z
+          .number()
+          .nullable()
+          .describe("Each team's FAAB budget; only used with faab waivers"),
+        trade_deadline: z
+          .number()
+          .nullable()
+          .describe(
+            "The last week trades are allowed; a week after the season (like 99) means no deadline",
+          ),
+      },
+    },
+    async (args) => {
+      const league_id = ctx.resolveLeagueId(args.league_id);
+      const league: League = await ctx.callLeagueApi(league_id);
+      const details = leagueDetails(league);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(details, null, 2) }],
+        structuredContent: details,
+      };
+    },
+  );
+
   server.registerTool(
     "get_league_rosters",
     {
