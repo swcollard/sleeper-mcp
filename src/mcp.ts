@@ -6,6 +6,7 @@ import { registerLeagueTools } from "./tools/league.js";
 import { registerPlayerTools } from "./tools/players.js";
 import { registerScoreboardTools } from "./tools/scoreboard.js";
 import { registerStateTools } from "./tools/state.js";
+import { registerTeamTools } from "./tools/teams.js";
 
 export type McpServerDeps = {
   /** Cached JSON GET helper, see createApiClient. */
@@ -44,6 +45,7 @@ export function createMcpServer({
   registerPlayerTools(server, ctx);
   registerLeagueTools(server, ctx);
   registerScoreboardTools(server, ctx);
+  registerTeamTools(server, ctx);
 
   return server;
 }
