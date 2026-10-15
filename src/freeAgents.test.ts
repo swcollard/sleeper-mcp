@@ -190,6 +190,7 @@ describe("findFreeAgents", () => {
     });
     expect(players).toEqual([
       {
+        player_id: "wr1",
         name: "Mid WR",
         position: "WR",
         team: "KC",
@@ -198,6 +199,7 @@ describe("findFreeAgents", () => {
         may_be_on_waivers: true,
       },
       {
+        player_id: "wr2",
         name: "No Rank WR",
         position: "WR",
         team: "KC",

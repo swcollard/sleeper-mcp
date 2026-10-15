@@ -96,6 +96,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           .describe("The league rostered_by refers to; absent without one"),
         players: z.array(
           z.object({
+            player_id: z.string(),
             name: z.string(),
             position: z.string().nullable(),
             team: z.string().nullable().describe("NFL team"),
@@ -142,6 +143,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
         players: trending.map(({ player_id, count }) => {
           const p = players?.byId.get(player_id);
           return {
+            player_id,
             name: p?.name ?? player_id,
             position: p?.position ?? null,
             team: p?.team ?? null,
@@ -183,6 +185,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           .describe("The positions searched (the league's, after the filter)"),
         players: z.array(
           z.object({
+            player_id: z.string(),
             name: z.string(),
             position: z.string().nullable(),
             team: z.string().nullable().describe("NFL team"),

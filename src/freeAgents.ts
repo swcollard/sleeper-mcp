@@ -60,6 +60,7 @@ export function droppedPlayerIds(transactions: Transaction[]): Set<string> {
 }
 
 export type FreeAgent = {
+  player_id: string;
   name: string;
   position: string | null;
   team: string | null;
@@ -132,6 +133,7 @@ export function findFreeAgents(
       .sort((a, b) => rank(a) - rank(b) || 0)
       .slice(0, limit)
       .map((p) => ({
+        player_id: p.player_id,
         name: p.name,
         position: p.position,
         team: p.team,

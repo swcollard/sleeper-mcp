@@ -330,6 +330,7 @@ describe("transaction and market tools", () => {
         league_id: "L1",
         players: [
           {
+            player_id: "5555",
             name: "Waiver Wire",
             position: "WR",
             team: "NYJ",
@@ -338,6 +339,7 @@ describe("transaction and market tools", () => {
             rostered_by: null,
           },
           {
+            player_id: "6794",
             name: "Justin Jefferson",
             position: "WR",
             team: "MIN",
@@ -347,6 +349,7 @@ describe("transaction and market tools", () => {
           },
           // Unknown to the player data
           {
+            player_id: "0000",
             name: "0000",
             position: null,
             team: null,
@@ -438,6 +441,7 @@ describe("transaction and market tools", () => {
         positions: ["QB", "RB", "WR", "TE", "DEF"],
         players: [
           {
+            player_id: "5555",
             name: "Waiver Wire",
             position: "WR",
             team: "NYJ",
@@ -446,6 +450,7 @@ describe("transaction and market tools", () => {
             may_be_on_waivers: true,
           },
           {
+            player_id: "7777",
             name: "Free Tight End",
             position: "TE",
             team: "DAL",
@@ -454,6 +459,7 @@ describe("transaction and market tools", () => {
             may_be_on_waivers: false,
           },
           {
+            player_id: "KC",
             name: "Kansas City Chiefs",
             position: "DEF",
             team: "KC",
