@@ -34,8 +34,8 @@ export function scoringType(scoring_settings: Record<string, number>): string {
   return `custom (${rec} per reception)`;
 }
 
-// Sleeper doesn't document settings.waiver_type; this is how leagues set to
-// each waiver mode in the app report it. Unknown values are passed through.
+// Sleeper doesn't document settings.waiver_type. This mapping follows what
+// open-source Sleeper clients use; unknown values are passed through.
 const WAIVER_TYPES: Record<number, string> = {
   0: "rolling",
   1: "reverse_standings",
