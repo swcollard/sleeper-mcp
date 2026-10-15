@@ -66,6 +66,12 @@ League tools take an optional `league_id`. When it's omitted they use, in order:
 
 Without either, the model asks the user for their league id. Set `DEFAULT_LEAGUE_ID` like `API_KEY` above: as an environment variable for Node and Docker, or for the Worker as a variable in `wrangler.jsonc` (`"vars": { "DEFAULT_LEAGUE_ID": "<id>" }`) or the Cloudflare dashboard. A shared Worker usually wants the query parameter instead, so each client picks its own league.
 
+## Players and teams
+
+- `search_players` finds players and team defenses by name: exact names first, then partial names ("mahomes", "pat mah"), then small typos ("mahomse"). Defenses also match their team's nickname or abbreviation ("Chiefs", "KC"). It can filter by position and NFL team (`"FA"` for free agents), and returns up to 50 results (10 by default). The matching is in `src/playerSearch.ts`.
+- `get_player_details` returns position, team, injury status, depth chart and more for up to 100 player ids at once, with `as_of` saying when the player data was downloaded. Unknown ids are listed in `not_found`.
+- `get_league_teams` returns each team in a league (or one, by `roster_id`) with its owner, record, points, and players by name split into starters, bench, IR and taxi. An empty lineup slot is `null` in `starters`. The join is in `src/teams.ts`, using `src/rosterOwners.ts` (roster id to owner and team name), which the scoreboard shares.
+
 ## Development
 
 - `npm test` runs the unit tests.
