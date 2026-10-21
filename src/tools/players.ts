@@ -54,7 +54,6 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
       },
     },
     async ({ query, position, team, limit }) => {
-      console.log(`search_players for ${query}`);
       const players = searchPlayers(await ctx.getPlayers(), query, {
         position,
         team,
@@ -127,7 +126,6 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
       },
     },
     async ({ name }) => {
-      console.log(`get_player_id for ${name}`);
       const id = (await ctx.getPlayers()).findByName(name)[0]?.player_id;
 
       if (!id) {
@@ -151,7 +149,6 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
       },
     },
     async ({ id }) => {
-      console.log(`get_player_name for ${id}`);
       const name = (await ctx.getPlayers()).idToName.get(id);
 
       if (!name) {
