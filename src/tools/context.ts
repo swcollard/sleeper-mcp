@@ -113,6 +113,9 @@ export function createToolContext({
   };
 }
 
+/** Every tool only reads from Sleeper, an external service. */
+export const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
+
 /** A tool result carrying data as both JSON text and structured content. */
 export function jsonResult<T extends Record<string, unknown>>(data: T) {
   return {

@@ -16,7 +16,7 @@ import {
   type User,
 } from "../sleeper.js";
 import { teamNamesByRoster } from "../rosterOwners.js";
-import { jsonResult, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
 import { playerSummarySchema } from "./schemas.js";
 
 const limitSchema = z
@@ -72,6 +72,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
       title: "Get Trending Players on Sleeper",
       description:
         "Fetches the players most added or dropped across all Sleeper leagues over the last lookback_hours. If a league is given (or a default league is set), also says which team in that league has each player, or null for free agents.",
+      annotations: READ_ONLY,
       inputSchema: {
         type: z
           .enum(["add", "drop"])
@@ -157,6 +158,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
       title: "Get Free Agents in Sleeper Fantasy League",
       description:
         "Lists the best available players in a Sleeper league: active NFL players at positions the league starts who aren't on any roster (including IR and taxi). Ranked by Sleeper's overall player ranking, not a weekly projection. may_be_on_waivers marks players dropped this week, who may still be on waivers rather than free agents; it's approximate.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         position: z

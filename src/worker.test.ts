@@ -328,6 +328,18 @@ describe("worker fetch handler", () => {
     });
   });
 
+  it("marks every tool read-only", async () => {
+    const handle = createFetchHandler({ fetchFn: stubSleeper() });
+    const body = await (await handle(mcpRequest(1, "tools/list"))).json();
+
+    for (const tool of body.result.tools) {
+      expect(tool.annotations, tool.name).toMatchObject({
+        readOnlyHint: true,
+        openWorldHint: true,
+      });
+    }
+  });
+
   describe("API key", () => {
     const env = { API_KEY: "secret-1, secret-2" };
     const listTools = () => mcpRequest(1, "tools/list");

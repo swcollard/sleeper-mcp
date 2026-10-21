@@ -4,7 +4,7 @@ import type { PlayerDirectory } from "../players.js";
 import type { Roster, Transaction, User } from "../sleeper.js";
 import { teamNamesByRoster } from "../rosterOwners.js";
 import { summarizeTransactions, TRANSACTION_TYPES } from "../transactions.js";
-import { jsonResult, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
 import { weekSchema } from "./schemas.js";
 
 const teamSchema = z.string().describe("Team name");
@@ -16,6 +16,7 @@ export function registerTransactionTools(server: McpServer, ctx: ToolContext) {
       title: "Get Transactions for Sleeper Fantasy League",
       description:
         "Fetches a week's trades, waiver claims, free agent pickups and commissioner moves in a Sleeper league, newest first, with team and player names. Includes failed waiver claims (status failed).",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         week: weekSchema,

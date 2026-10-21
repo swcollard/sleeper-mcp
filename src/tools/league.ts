@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { leagueDetails } from "../leagues.js";
 import type { League } from "../sleeper.js";
-import { jsonResult, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
 import { leagueSummaryFields, lineupFields, weekSchema } from "./schemas.js";
 
 export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
@@ -12,6 +12,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
       title: "Get Settings for Sleeper Fantasy League",
       description:
         "Fetches a fantasy football league's settings from the Sleeper API: its name, season, status, lineup slots, scoring, playoff format, waivers and trade deadline.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
       },
@@ -62,7 +63,8 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Rosters for Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football rosters from the Sleeper API for a given league id.",
+        "Fetches the rosters in a Sleeper league: each roster's owner id, player ids, record and waiver settings. get_league_teams returns the same teams with names.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
       },
@@ -105,7 +107,8 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Users for Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football users from the Sleeper API for a given league id, this provides metatdata to be combined with the get_league_rosters tool to get a full picture of the existing league.",
+        "Fetches the users in a Sleeper league, with their display and team names. A user's user_id matches owner_id in get_league_rosters.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
       },
@@ -138,6 +141,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
       title: "Get Matchups for Sleeper Fantasy League",
       description:
         "Fetches a week's fantasy football matchups in a Sleeper league. Rosters with the same matchup_id are going head to head. Defaults to the current week.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         week: weekSchema,

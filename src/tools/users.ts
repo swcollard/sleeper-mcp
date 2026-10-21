@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { summarizeLeague } from "../leagues.js";
 import { SLEEPER_API, type League, type SleeperUser } from "../sleeper.js";
-import { jsonResult, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
 import { leagueSummaryFields } from "./schemas.js";
 
 // Both go into request paths, so only safe characters are allowed. Sleeper
@@ -30,6 +30,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext) {
       title: "Find a Sleeper User's Leagues",
       description:
         "Finds the NFL fantasy leagues a Sleeper user is in for a season, from their username. Use it to get the league_id the league tools need when the user doesn't know it.",
+      annotations: READ_ONLY,
       inputSchema: {
         username: usernameSchema,
         season: seasonSchema,

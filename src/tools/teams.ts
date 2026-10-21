@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import type { Roster, User } from "../sleeper.js";
 import { buildLeagueTeams } from "../teams.js";
-import { jsonResult, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
 import { playerSummarySchema } from "./schemas.js";
 
 export function registerTeamTools(server: McpServer, ctx: ToolContext) {
@@ -13,6 +13,7 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
       title: "Get Teams in a Sleeper Fantasy League",
       description:
         "Fetches every team in a Sleeper league, or one team by roster_id: its owner, team name, record, points, and players by name, split into starters, bench, IR (reserve) and taxi squad.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         roster_id: z

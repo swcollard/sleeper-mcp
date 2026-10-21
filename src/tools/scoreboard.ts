@@ -3,17 +3,17 @@ import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import { buildScoreboard } from "../scoreboard.js";
 import type { MatchupEntry, Roster, User } from "../sleeper.js";
-import { jsonResult, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
 import { weekSchema } from "./schemas.js";
 
 export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
     "get_matchup_scoreboard",
     {
-      title:
-        "Get current weeks matchups and scores for a Sleeper Fantasy League",
+      title: "Get Matchup Scoreboard for Sleeper Fantasy League",
       description:
         "Fetches a week's fantasy football matchups and their scores in a Sleeper league, with team and player names. Defaults to the current week.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         week: weekSchema,

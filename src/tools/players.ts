@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchPlayers } from "../playerSearch.js";
 import type { PlayerInfo } from "../players.js";
-import { jsonResult, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
 import { playerInfoSchema, playerSummarySchema } from "./schemas.js";
 
 /** At most this many players per get_player_details call. */
@@ -20,6 +20,7 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
       title: "Search Players",
       description:
         'Searches NFL players and team defenses by name, tolerating partial names ("mahomes", "pat mah") and small typos. Defenses match by team name, nickname or abbreviation ("Chiefs", "KC"). Returns the best matches first; use the player_id with other tools.',
+      annotations: READ_ONLY,
       inputSchema: {
         query: z
           .string()
@@ -76,6 +77,7 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Player Details",
       description: `Fetches details for up to ${MAX_DETAIL_IDS} players by id: position, NFL team, injury status, depth chart, age and experience. Ids that don't match a player are listed in not_found.`,
+      annotations: READ_ONLY,
       inputSchema: {
         player_ids: z.array(playerIdSchema).min(1).max(MAX_DETAIL_IDS),
       },
@@ -113,9 +115,12 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Player ID",
       description:
-        "Given a players full name, fetches the player id used in sleeper. Ignores case, punctuation and suffixes like Jr. If several players share the name, returns the most relevant one (active, then highest ranked).",
+        "Fetches the Sleeper player id for a player's full name. Ignores case, punctuation and suffixes like Jr. If several players share the name, returns the most relevant one (active, then highest ranked).",
+      annotations: READ_ONLY,
       inputSchema: {
-        name: z.string(),
+        name: z
+          .string()
+          .describe('The player\'s full name, e.g. "Patrick Mahomes"'),
       },
       outputSchema: {
         player_id: z.string(),
@@ -136,10 +141,10 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
     "get_player_name",
     {
       title: "Get Player Name",
-      description:
-        "Given a players ID, fetches their full name used in sleeper",
+      description: "Fetches a player's full name from their Sleeper player id.",
+      annotations: READ_ONLY,
       inputSchema: {
-        id: z.string(),
+        id: z.string().describe("The Sleeper player id"),
       },
       outputSchema: {
         player_name: z.string(),
