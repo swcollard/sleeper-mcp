@@ -67,9 +67,7 @@ async function loadPlayers(
   let cached: CachedPlayers | null | undefined;
   try {
     cached = (await env.PLAYERS_KV?.get(PLAYERS_KV_KEY, "json")) as
-      | CachedPlayers
-      | null
-      | undefined;
+      CachedPlayers | null | undefined;
   } catch (error) {
     console.error("Error reading player data from KV:", error);
   }

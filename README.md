@@ -1,4 +1,5 @@
 # sleeper-mcp
+
 Typescript MCP Server implementation for Sleeper Fantasy Football API
 
 The same tools can run two ways: as a standalone Node server, or as a Cloudflare Worker. Both serve stateless Streamable HTTP at `/mcp`.
@@ -89,8 +90,9 @@ The logic lives in `src/transactions.ts` and `src/freeAgents.ts`; the tools are 
 
 - `npm test` runs the unit tests.
 - `npm run typecheck` type-checks everything, tests included (`npm run build` leaves tests out).
+- `npm run lint` lints with oxlint, and `npm run format` formats with Prettier.
 
-CI runs both, plus the build and a Worker bundle check (`wrangler deploy --dry-run`), on every pull request.
+CI runs all of these (checking formatting with `npm run format:check`), plus the build and a Worker bundle check (`wrangler deploy --dry-run`), on every pull request.
 
 ### Layout
 

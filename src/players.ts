@@ -175,7 +175,7 @@ export function slimPlayers(
   const slim: Record<string, Player> = {};
   for (const [id, info] of directory.byId) {
     // player_id is the record's key, so it isn't stored again
-    const { player_id, name, fantasy_positions, ...rest } = info;
+    const { player_id: _id, name, fantasy_positions, ...rest } = info;
     const player: Player = { full_name: name };
     if (fantasy_positions.length) player.fantasy_positions = fantasy_positions;
     for (const [field, value] of Object.entries(rest)) {

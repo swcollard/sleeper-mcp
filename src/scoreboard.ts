@@ -66,7 +66,7 @@ export function buildScoreboard(
       ),
       starters_points: Object.fromEntries(
         Object.entries(e.players_points)
-          .filter(([id, _]) => starters.includes(id))
+          .filter(([id]) => starters.includes(id))
           .map(([id, points]) => [playerIdToName.get(id) || id, points]),
       ),
       matchup_id: e.matchup_id,
