@@ -66,6 +66,11 @@ League tools take an optional `league_id`. When it's omitted they use, in order:
 
 Without either, the model asks the user for their league id. Set `DEFAULT_LEAGUE_ID` like `API_KEY` above: as an environment variable for Node and Docker, or for the Worker as a variable in `wrangler.jsonc` (`"vars": { "DEFAULT_LEAGUE_ID": "<id>" }`) or the Cloudflare dashboard. A shared Worker usually wants the query parameter instead, so each client picks its own league.
 
+## Users and leagues
+
+- `find_user_leagues` takes a Sleeper username (and optionally a season, defaulting to the one leagues are currently played or created for) and lists that user's leagues: id, name, season, status, number of teams and scoring type. Users who don't know their league id can find it this way.
+- `get_league` returns a league's settings: lineup slots, scoring (as `ppr`, `half_ppr`, `standard` or `custom (N per reception)`, plus the full points-per-stat table), playoff teams and start week, waiver type and FAAB budget, and trade deadline.
+
 ## Transactions and free agents
 
 - `get_league_transactions` lists a week's trades, waiver claims (failed ones included, with their FAAB bids), free agent moves and commissioner moves, newest first, with team and player names. It defaults to the current week and can filter by type.
