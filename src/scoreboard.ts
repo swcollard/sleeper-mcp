@@ -20,8 +20,9 @@ export type ScoreBoardEntry = {
   starters: string[];
   players: string[];
   total_points: number;
-  players_points: Record<string, number>; // player name to points score
-  starters_points: Record<string, number>; // starters name to points score
+  /** Keyed by player name */
+  players_points: Record<string, number>;
+  starters_points: Record<string, number>;
   matchup_id: number | null;
 };
 
@@ -41,7 +42,6 @@ export function buildScoreboard(
 ): Matchup[] {
   const owners = buildRosterOwners(users, rosters);
 
-  // Group entries into matchups by matchup_id
   const grouped = new Map<number | null, ScoreBoardEntry[]>();
   for (const e of matchupEntries) {
     let matchupGroup = grouped.get(e.matchup_id);

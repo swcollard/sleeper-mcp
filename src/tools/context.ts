@@ -37,6 +37,11 @@ export type ToolContext = {
   resolveLeagueId: (league_id: string | undefined) => string;
 };
 
+export type ToolContextDeps = Pick<ToolContext, "callApi" | "getPlayers"> & {
+  /** League id the league tools use when called without one. */
+  defaultLeagueId?: string | undefined;
+};
+
 /**
  * Builds the ToolContext. defaultLeagueId comes from the client's
  * `?league_id=` or the server's DEFAULT_LEAGUE_ID, so it is checked like
@@ -46,11 +51,7 @@ export function createToolContext({
   callApi,
   getPlayers,
   defaultLeagueId,
-}: {
-  callApi: ToolContext["callApi"];
-  getPlayers: ToolContext["getPlayers"];
-  defaultLeagueId?: string | undefined;
-}): ToolContext {
+}: ToolContextDeps): ToolContext {
   const callLeagueApi = async (league_id: string, path?: string) => {
     const data = await callApi(
       `${SLEEPER_API}/league/${encodeURIComponent(league_id)}${path ? `/${path}` : ""}`,

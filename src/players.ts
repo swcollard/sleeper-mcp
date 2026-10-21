@@ -188,7 +188,7 @@ export function slimPlayers(
   return slim;
 }
 
-/** Fetches Sleeper's full player list (several MB; Sleeper asks for at most one call per day). */
+/** Fetches Sleeper's full player list, which is several MB. */
 export async function fetchPlayers(
   fetchFn: typeof fetch = fetch,
 ): Promise<Record<string, Player>> {

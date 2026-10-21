@@ -39,7 +39,7 @@ export type User = {
   user_id: string;
   username: string;
   display_name: string;
-  // Sleeper omits metadata, or team_name within it, when no team name is set
+  /** Absent, or without team_name, when no team name is set */
   metadata?: {
     team_name?: string;
   };
@@ -67,11 +67,15 @@ export type League = {
 /** GET /league/{league_id}/rosters */
 export type Roster = {
   roster_id: number;
-  owner_id: string | null; // user_id; null for orphaned teams
-  players: string[] | null; // player IDs; null before the draft
-  starters: string[] | null; // player IDs; null before the draft
-  // Points are split into a whole part and hundredths: fpts + fpts_decimal / 100.
-  // Rosters that haven't scored yet leave them out.
+  /** A user_id; null for orphaned teams */
+  owner_id: string | null;
+  /** Player ids; null before the draft */
+  players: string[] | null;
+  starters: string[] | null;
+  /**
+   * Points are split into a whole part and hundredths (fpts + fpts_decimal /
+   * 100), and left out until the roster scores.
+   */
   settings: {
     fpts?: number;
     fpts_decimal?: number;
@@ -84,19 +88,23 @@ export type Roster = {
     waiver_position: number;
     waiver_budget_used: number;
   };
-  reserve?: string[] | null; // player IDs on IR
-  taxi?: string[] | null; // player IDs on the taxi squad (dynasty)
+  /** Player ids on IR */
+  reserve?: string[] | null;
+  /** Player ids on the taxi squad (dynasty) */
+  taxi?: string[] | null;
   league_id: string;
 };
 
 /** GET /league/{league_id}/matchups/{week} */
 export type MatchupEntry = {
   roster_id: number;
-  starters: string[] | null; // player IDs; null before the draft
-  players: string[] | null; // player IDs; null before the draft
+  /** Player ids; null before the draft */
+  starters: string[] | null;
+  players: string[] | null;
   points: number;
-  players_points: Record<string, number>; // player id to points score
-  // null when the roster has no opponent this week (e.g. eliminated in playoffs)
+  /** Keyed by player id */
+  players_points: Record<string, number>;
+  /** Null when the roster has no opponent this week (e.g. eliminated in playoffs) */
   matchup_id: number | null;
 };
 
@@ -106,8 +114,9 @@ export type DraftPick = {
   round: number;
   /** The roster the pick originally belonged to */
   roster_id: number;
-  previous_owner_id: number; // roster_id
-  owner_id: number; // roster_id
+  /** A roster_id, as is owner_id */
+  previous_owner_id: number;
+  owner_id: number;
 };
 
 /** GET /league/{league_id}/transactions/{round}, where round is the week */
@@ -120,11 +129,14 @@ export type Transaction = {
   /** Milliseconds since the epoch */
   created: number;
   status_updated: number;
-  creator: string; // user_id
+  /** A user_id */
+  creator: string;
   roster_ids: number[];
-  consenter_ids: number[] | null; // roster_ids
-  adds: Record<string, number> | null; // player id to receiving roster_id
-  drops: Record<string, number> | null; // player id to dropping roster_id
+  consenter_ids: number[] | null;
+  /** Player id to the roster_id that added it */
+  adds: Record<string, number> | null;
+  /** Player id to the roster_id that dropped it */
+  drops: Record<string, number> | null;
   draft_picks: DraftPick[];
   /** FAAB moved in a trade */
   waiver_budget: { sender: number; receiver: number; amount: number }[];
