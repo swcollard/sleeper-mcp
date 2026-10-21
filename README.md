@@ -39,7 +39,7 @@ Note: the first player lookup in a fresh isolate parses Sleeper's full player li
 
 ## API key
 
-Set `API_KEY` to require clients to send `Authorization: Bearer <key>` with every request; others get a `401`. Without it, the server accepts all requests and logs a warning. To rotate keys without downtime, set several comma-separated keys (`API_KEY=new-key,old-key`), update your clients, then remove the old one.
+Set `API_KEY` to require clients to send the key with every request, either as an `x-api-key: <key>` header or as `Authorization: Bearer <key>`; others get a `401`. Without it, the server accepts all requests and logs a warning. To rotate keys without downtime, set several comma-separated keys (`API_KEY=new-key,old-key`), update your clients, then remove the old one.
 
 Generate a key with `openssl rand -hex 32`, then set it:
 
@@ -47,12 +47,15 @@ Generate a key with `openssl rand -hex 32`, then set it:
 - **Docker:** `docker run -p 3000:3000 -e API_KEY=<key> sleeper-mcp`
 - **Cloudflare Worker:** `npx wrangler secret put API_KEY`, or add it as a **Secret** under the Worker's Settings → Variables and Secrets in the Cloudflare dashboard. Secrets persist across deploys. For `npm run worker:dev`, put `API_KEY=<key>` in a `.dev.vars` file (gitignored).
 
-Then configure your MCP client to send the header. For example, with Claude Code:
+Then configure your MCP client to send the key:
 
-```sh
-claude mcp add --transport http sleeper https://<your-worker>.workers.dev/mcp \
-  --header "Authorization: Bearer <key>"
-```
+- **claude.ai custom connector:** in **Customize → Connectors → Add custom connector**, choose **No sign-in**, then under **Request headers** pick `x-api-key` and enter just the key. Claude sends header values exactly as entered, so if you use `authorization` instead, enter `Bearer <key>` including the `Bearer ` prefix. Request headers are in beta and not yet available to every account; authentication settings can't be edited later, so to change the key, remove the connector and add it again.
+- **Claude Code:**
+
+  ```sh
+  claude mcp add --transport http sleeper https://<your-worker>.workers.dev/mcp \
+    --header "x-api-key: <key>"
+  ```
 
 ## Default league
 
@@ -62,6 +65,25 @@ League tools take an optional `league_id`. When it's omitted they use, in order:
 2. the `DEFAULT_LEAGUE_ID` setting for the whole server
 
 Without either, the model asks the user for their league id. Set `DEFAULT_LEAGUE_ID` like `API_KEY` above: as an environment variable for Node and Docker, or for the Worker as a variable in `wrangler.jsonc` (`"vars": { "DEFAULT_LEAGUE_ID": "<id>" }`) or the Cloudflare dashboard. A shared Worker usually wants the query parameter instead, so each client picks its own league.
+
+## Users and leagues
+
+- `find_user_leagues` takes a Sleeper username (and optionally a season, defaulting to the one leagues are currently played or created for) and lists that user's leagues: id, name, season, status, number of teams and scoring type. Users who don't know their league id can find it this way.
+- `get_league` returns a league's settings: lineup slots, scoring (as `ppr`, `half_ppr`, `standard` or `custom (N per reception)`, plus the full points-per-stat table), playoff teams and start week, waiver type and FAAB budget, and trade deadline.
+
+## Transactions and free agents
+
+- `get_league_transactions` lists a week's trades, waiver claims (failed ones included, with their FAAB bids), free agent moves and commissioner moves, newest first, with team and player names. It defaults to the current week and can filter by type.
+- `get_trending_players` lists the players most added or dropped across Sleeper over the last 1–168 hours. With a league (the argument or the default league), it also says which team has each player.
+- `get_free_agents` computes a league's best available players, since Sleeper has no endpoint for it: active players at positions the league starts, minus everyone on a roster, IR or taxi squad, ranked by Sleeper's overall ranking (not a weekly projection). Players dropped this week are flagged as possibly still on waivers; this is approximate. It needs the player list, so it fails if that can't load.
+
+The logic lives in `src/transactions.ts` and `src/freeAgents.ts`; the tools are in `src/tools/transactions.ts` and `src/tools/market.ts`.
+
+## Players and teams
+
+- `search_players` finds players and team defenses by name: exact names first, then partial names ("mahomes", "pat mah"), then small typos ("mahomse"). Defenses also match their team's nickname or abbreviation ("Chiefs", "KC"). It can filter by position and NFL team (`"FA"` for free agents), and returns up to 50 results (10 by default). The matching is in `src/playerSearch.ts`.
+- `get_player_details` returns position, team, injury status, depth chart and more for up to 100 player ids at once, with `as_of` saying when the player data was downloaded. Unknown ids are listed in `not_found`.
+- `get_league_teams` returns each team in a league (or one, by `roster_id`) with its owner, record, points, and players by name split into starters, bench, IR and taxi. An empty lineup slot is `null` in `starters`. The join is in `src/teams.ts`, using `src/rosterOwners.ts` (roster id to owner and team name), which the scoreboard shares.
 
 ## Development
 

@@ -31,8 +31,8 @@ export type Env = {
    */
   PLAYERS_KV?: KVNamespaceLike;
   /**
-   * Comma-separated API keys; requests must send one as
-   * `Authorization: Bearer <key>`. Set with `wrangler secret put API_KEY`.
+   * Comma-separated API keys; requests must send one as `x-api-key: <key>`
+   * or `Authorization: Bearer <key>`. Set with `wrangler secret put API_KEY`.
    * When unset, the server accepts all requests.
    */
   API_KEY?: string;
@@ -129,7 +129,7 @@ export function createFetchHandler({
         warnedNoApiKey = true;
       }
     } else if (
-      !(await isAuthorized(request.headers.get("authorization"), apiKeys))
+      !(await isAuthorized((name) => request.headers.get(name), apiKeys))
     ) {
       return Response.json(UNAUTHORIZED_BODY, {
         status: 401,

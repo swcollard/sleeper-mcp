@@ -79,7 +79,7 @@ export function createToolContext({
     .describe(
       validDefault
         ? `The Sleeper league id. Omit it to use the user's default league (${validDefault}).`
-        : "The Sleeper league id. Ask the user for it if you don't know it.",
+        : "The Sleeper league id. Ask the user for it, or find it from their Sleeper username with find_user_leagues.",
     );
 
   const resolveLeagueId = (league_id: string | undefined) => {
@@ -87,8 +87,8 @@ export function createToolContext({
     if (!resolved) {
       throw new Error(
         defaultLeagueId === undefined
-          ? "No league_id given and no default league is configured. Ask the user for their Sleeper league id."
-          : `No league_id given, and the configured default league id "${defaultLeagueId}" is invalid. Ask the user for their Sleeper league id.`,
+          ? "No league_id given and no default league is configured. Ask the user for it, or find it from their Sleeper username with find_user_leagues."
+          : `No league_id given, and the configured default league id "${defaultLeagueId}" is invalid. Ask the user for it, or find it from their Sleeper username with find_user_leagues.`,
       );
     }
     return resolved;
