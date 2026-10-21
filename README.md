@@ -71,6 +71,14 @@ Without either, the model asks the user for their league id. Set `DEFAULT_LEAGUE
 - `find_user_leagues` takes a Sleeper username (and optionally a season, defaulting to the one leagues are currently played or created for) and lists that user's leagues: id, name, season, status, number of teams and scoring type. Users who don't know their league id can find it this way.
 - `get_league` returns a league's settings: lineup slots, scoring (as `ppr`, `half_ppr`, `standard` or `custom (N per reception)`, plus the full points-per-stat table), playoff teams and start week, waiver type and FAAB budget, and trade deadline.
 
+## Transactions and free agents
+
+- `get_league_transactions` lists a week's trades, waiver claims (failed ones included, with their FAAB bids), free agent moves and commissioner moves, newest first, with team and player names. It defaults to the current week and can filter by type.
+- `get_trending_players` lists the players most added or dropped across Sleeper over the last 1–168 hours. With a league (the argument or the default league), it also says which team has each player.
+- `get_free_agents` computes a league's best available players, since Sleeper has no endpoint for it: active players at positions the league starts, minus everyone on a roster, IR or taxi squad, ranked by Sleeper's overall ranking (not a weekly projection). Players dropped this week are flagged as possibly still on waivers; this is approximate. It needs the player list, so it fails if that can't load.
+
+The logic lives in `src/transactions.ts` and `src/freeAgents.ts`; the tools are in `src/tools/transactions.ts` and `src/tools/market.ts`.
+
 ## Development
 
 - `npm test` runs the unit tests.
