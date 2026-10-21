@@ -92,8 +92,8 @@ app.post("/mcp", async (req, res) => {
   }
 });
 
-const port = parseInt(process.env.PORT || "3000");
-app
+const port = parseInt(process.env.PORT || "3000", 10);
+const httpServer = app
   .listen(port, () => {
     console.log(`Sleeper MCP Server running on http://localhost:${port}/mcp`);
   })
@@ -101,3 +101,10 @@ app
     console.error("Server error:", error);
     process.exit(1);
   });
+
+// Finish in-flight requests before exiting
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    httpServer.close(() => process.exit(0));
+  });
+}
