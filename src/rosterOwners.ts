@@ -28,3 +28,19 @@ export function buildRosterOwners(
   }
   return owners;
 }
+
+/**
+ * Maps roster ids to team names: the owner's team name, else their display
+ * name, else "Team {roster_id}" (e.g. for orphaned teams).
+ */
+export function teamNamesByRoster(
+  users: User[],
+  rosters: Roster[],
+): Map<number, string> {
+  return new Map(
+    [...buildRosterOwners(users, rosters)].map(([roster_id, owner]) => [
+      roster_id,
+      owner.team_name || owner.owner_name || `Team ${roster_id}`,
+    ]),
+  );
+}

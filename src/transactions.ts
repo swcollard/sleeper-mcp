@@ -1,4 +1,4 @@
-import type { NflState, Roster, Transaction, User } from "./sleeper.js";
+import type { Transaction } from "./sleeper.js";
 
 export const TRANSACTION_TYPES = [
   "trade",
@@ -31,36 +31,6 @@ export type TransactionSummary = {
   /** Sleeper's note, e.g. why a waiver claim failed */
   notes?: string;
 };
-
-/**
- * The week week-based tools default to. Sleeper's state week is 0 in the
- * preseason, and fantasy weeks end at 18, so it's clamped to 1–18.
- */
-export function defaultWeek(state: NflState): number {
-  return Math.min(18, Math.max(1, state.week || 1));
-}
-
-/**
- * Maps roster ids to team names: the owner's team name, else their display
- * name, else "Team {roster_id}" (e.g. for orphaned teams).
- */
-export function teamNamesByRoster(
-  users: User[],
-  rosters: Roster[],
-): Map<number, string> {
-  const usersById = new Map(users.map((u) => [u.user_id, u]));
-  return new Map(
-    rosters.map((r) => {
-      const user = r.owner_id ? usersById.get(r.owner_id) : undefined;
-      return [
-        r.roster_id,
-        user?.metadata?.team_name ||
-          user?.display_name ||
-          `Team ${r.roster_id}`,
-      ];
-    }),
-  );
-}
 
 /**
  * Turns raw Sleeper transactions into summaries with team and player names

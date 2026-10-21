@@ -2,12 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import type { Roster, Transaction, User } from "../sleeper.js";
-import {
-  defaultWeek,
-  summarizeTransactions,
-  teamNamesByRoster,
-  TRANSACTION_TYPES,
-} from "../transactions.js";
+import { teamNamesByRoster } from "../rosterOwners.js";
+import { summarizeTransactions, TRANSACTION_TYPES } from "../transactions.js";
 import { jsonResult, type ToolContext } from "./context.js";
 
 const teamSchema = z.string().describe("Team name");
@@ -84,7 +80,7 @@ export function registerTransactionTools(server: McpServer, ctx: ToolContext) {
     },
     async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const week = args.week ?? defaultWeek(await ctx.getNflState());
+      const week = await ctx.resolveWeek(args.week);
       const [transactions, users, rosters, players]: [
         Transaction[],
         User[],

@@ -3,7 +3,8 @@ import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import { buildScoreboard } from "../scoreboard.js";
 import type { MatchupEntry, Roster, User } from "../sleeper.js";
-import { jsonResult, weekSchema, type ToolContext } from "./context.js";
+import { jsonResult, type ToolContext } from "./context.js";
+import { weekSchema } from "./schemas.js";
 
 export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(

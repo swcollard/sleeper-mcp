@@ -2,13 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { leagueDetails } from "../leagues.js";
 import type { League } from "../sleeper.js";
-import {
-  jsonResult,
-  leagueIdSchema,
-  weekSchema,
-  type ToolContext,
-} from "./context.js";
-import { leagueSummaryFields } from "./users.js";
+import { jsonResult, type ToolContext } from "./context.js";
+import { leagueIdSchema, leagueSummaryFields, weekSchema } from "./schemas.js";
 
 export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(

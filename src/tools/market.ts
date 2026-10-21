@@ -15,7 +15,7 @@ import {
   type TrendingPlayer,
   type User,
 } from "../sleeper.js";
-import { defaultWeek, teamNamesByRoster } from "../transactions.js";
+import { teamNamesByRoster } from "../rosterOwners.js";
 import { jsonResult, type ToolContext } from "./context.js";
 
 const limitSchema = z
@@ -205,10 +205,8 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
         ctx.callLeagueApi(league_id),
         ctx.callLeagueApi(league_id, "rosters"),
         ctx
-          .getNflState()
-          .then((state) =>
-            ctx.callLeagueApi(league_id, `transactions/${defaultWeek(state)}`),
-          ),
+          .resolveWeek(undefined)
+          .then((week) => ctx.callLeagueApi(league_id, `transactions/${week}`)),
         // Unlike other tools, this can't work without player data
         ctx.getPlayers(),
       ]);

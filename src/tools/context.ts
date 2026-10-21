@@ -1,21 +1,15 @@
 import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import { SLEEPER_API, type NflState } from "../sleeper.js";
+import { leagueIdSchema } from "./schemas.js";
 
-// Sleeper league ids are numeric strings; restricting the charset keeps model
-// input from rewriting the request path (e.g. "../state/nfl").
-export const leagueIdSchema = z
-  .string()
-  .regex(/^[A-Za-z0-9]+$/, "league_id must be alphanumeric");
-
-export const weekSchema = z
-  .number()
-  .int()
-  .min(1)
-  .max(18)
-  .describe(
-    "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
-  );
+/**
+ * The week week-based tools default to. Sleeper's state week is 0 in the
+ * preseason, and fantasy weeks end at 18, so it's clamped to 1–18.
+ */
+export function defaultWeek(state: NflState): number {
+  return Math.min(18, Math.max(1, state.week || 1));
+}
 
 /** What every tool module gets; see createMcpServer. */
 export type ToolContext = {
@@ -32,6 +26,8 @@ export type ToolContext = {
   callLeagueApi: (league_id: string, path?: string) => Promise<any>;
   /** The current NFL week and season, for tools whose week or season is optional. */
   getNflState: () => Promise<NflState>;
+  /** Returns the given week, else the current one (see defaultWeek). */
+  resolveWeek: (week: number | undefined) => Promise<number>;
   /**
    * The `league_id` input for league tools. It's optional: when omitted,
    * resolveLeagueId falls back to the default league.
@@ -74,6 +70,9 @@ export function createToolContext({
   const getNflState = (): Promise<NflState> =>
     callApi(`${SLEEPER_API}/state/nfl`);
 
+  const resolveWeek = async (week: number | undefined) =>
+    week ?? defaultWeek(await getNflState());
+
   const validDefault =
     defaultLeagueId === undefined
       ? undefined
@@ -108,6 +107,7 @@ export function createToolContext({
     tryGetPlayers,
     callLeagueApi,
     getNflState,
+    resolveWeek,
     leagueIdInput,
     resolveLeagueId,
   };
