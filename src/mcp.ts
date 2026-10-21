@@ -9,6 +9,7 @@ import { registerStateTools } from "./tools/state.js";
 import { registerUserTools } from "./tools/users.js";
 import { registerTransactionTools } from "./tools/transactions.js";
 import { registerMarketTools } from "./tools/market.js";
+import { registerTeamTools } from "./tools/teams.js";
 
 export type McpServerDeps = {
   /** Cached JSON GET helper, see createApiClient. */
@@ -50,6 +51,7 @@ export function createMcpServer({
   registerUserTools(server, ctx);
   registerTransactionTools(server, ctx);
   registerMarketTools(server, ctx);
+  registerTeamTools(server, ctx);
 
   return server;
 }
