@@ -16,7 +16,7 @@ import {
   type User,
 } from "../sleeper.js";
 import { defaultWeek, teamNamesByRoster } from "../transactions.js";
-import type { ToolContext } from "./context.js";
+import { jsonResult, type ToolContext } from "./context.js";
 
 const limitSchema = z
   .number()
@@ -128,11 +128,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
         ctx.callApi(
           `${SLEEPER_API}/players/nfl/trending/${encodeURIComponent(type)}?${query}`,
         ),
-        // Player details are a nicety here; fall back to ids if they can't load
-        ctx.getPlayers().catch((error) => {
-          console.error("Error loading player data:", error);
-          return undefined;
-        }),
+        ctx.tryGetPlayers(),
         rosteredIn(args.league_id),
       ]);
 
@@ -155,10 +151,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           };
         }),
       };
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return jsonResult(result);
     },
   );
 
@@ -236,10 +229,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           limit,
         }),
       };
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return jsonResult(result);
     },
   );
 }

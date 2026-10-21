@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { summarizeLeague } from "../leagues.js";
 import { SLEEPER_API, type League, type SleeperUser } from "../sleeper.js";
-import type { ToolContext } from "./context.js";
+import { jsonResult, type ToolContext } from "./context.js";
 
 // Both go into request paths, so only safe characters are allowed. Sleeper
 // usernames are letters, digits and underscores; user ids are numeric.
@@ -85,10 +85,7 @@ export function registerUserTools(server: McpServer, ctx: ToolContext) {
         season: resolvedSeason,
         leagues: (leagues ?? []).map(summarizeLeague),
       };
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return jsonResult(result);
     },
   );
 }

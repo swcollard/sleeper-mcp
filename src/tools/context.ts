@@ -23,6 +23,8 @@ export type ToolContext = {
   callApi: (url: string) => Promise<any>;
   /** Resolves player lookups; may load them lazily. */
   getPlayers: () => Promise<PlayerDirectory>;
+  /** getPlayers for tools that can fall back to player ids; undefined if it fails. */
+  tryGetPlayers: () => Promise<PlayerDirectory | undefined>;
   /**
    * Fetches a league, or a sub-resource of it like "rosters". Sleeper answers
    * an unknown league id with 200 and a `null` body, so this throws instead.
@@ -63,6 +65,12 @@ export function createToolContext({
     return data;
   };
 
+  const tryGetPlayers = () =>
+    getPlayers().catch((error) => {
+      console.error("Error loading player data:", error);
+      return undefined;
+    });
+
   const getNflState = (): Promise<NflState> =>
     callApi(`${SLEEPER_API}/state/nfl`);
 
@@ -97,9 +105,18 @@ export function createToolContext({
   return {
     callApi,
     getPlayers,
+    tryGetPlayers,
     callLeagueApi,
     getNflState,
     leagueIdInput,
     resolveLeagueId,
+  };
+}
+
+/** A tool result carrying data as both JSON text and structured content. */
+export function jsonResult<T extends Record<string, unknown>>(data: T) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+    structuredContent: data,
   };
 }

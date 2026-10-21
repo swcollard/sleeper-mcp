@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import type { Roster, User } from "../sleeper.js";
 import { buildLeagueTeams } from "../teams.js";
-import type { ToolContext } from "./context.js";
+import { jsonResult, type ToolContext } from "./context.js";
 
 const teamPlayerSchema = z.object({
   player_id: z.string(),
@@ -72,11 +72,7 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
       ] = await Promise.all([
         ctx.callLeagueApi(league_id, "users"),
         ctx.callLeagueApi(league_id, "rosters"),
-        // Player names are a nicety here; fall back to ids if they can't load
-        ctx.getPlayers().catch((error) => {
-          console.error("Error loading player data:", error);
-          return undefined;
-        }),
+        ctx.tryGetPlayers(),
       ]);
 
       const rosters =
@@ -92,10 +88,7 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
         players?.byId ?? new Map(),
       );
 
-      return {
-        content: [{ type: "text", text: JSON.stringify({ teams }, null, 2) }],
-        structuredContent: { teams },
-      };
+      return jsonResult({ teams });
     },
   );
 }

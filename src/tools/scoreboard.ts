@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import { buildScoreboard } from "../scoreboard.js";
 import type { MatchupEntry, Roster, User } from "../sleeper.js";
-import { weekSchema, type ToolContext } from "./context.js";
+import { jsonResult, weekSchema, type ToolContext } from "./context.js";
 
 export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
@@ -54,11 +54,7 @@ export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
         ctx.callLeagueApi(league_id, "users"),
         ctx.callLeagueApi(league_id, "rosters"),
         ctx.callLeagueApi(league_id, `matchups/${week}`),
-        // Player names are a nicety here; fall back to ids if they can't load
-        ctx.getPlayers().catch((error) => {
-          console.error("Error loading player data:", error);
-          return undefined;
-        }),
+        ctx.tryGetPlayers(),
       ]);
 
       const matchupList = buildScoreboard(
@@ -69,16 +65,7 @@ export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
         week,
       );
 
-      // Return the response in the expected tool output format
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ scoreboard: matchupList }, null, 5)}`,
-          },
-        ],
-        structuredContent: { scoreboard: matchupList },
-      };
+      return jsonResult({ scoreboard: matchupList });
     },
   );
 }

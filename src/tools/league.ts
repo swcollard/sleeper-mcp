@@ -2,7 +2,12 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { leagueDetails } from "../leagues.js";
 import type { League } from "../sleeper.js";
-import { leagueIdSchema, weekSchema, type ToolContext } from "./context.js";
+import {
+  jsonResult,
+  leagueIdSchema,
+  weekSchema,
+  type ToolContext,
+} from "./context.js";
 import { leagueSummaryFields } from "./users.js";
 
 export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
@@ -53,10 +58,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
       const league: League = await ctx.callLeagueApi(league_id);
       const details = leagueDetails(league);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(details, null, 2) }],
-        structuredContent: details,
-      };
+      return jsonResult(details);
     },
   );
 
@@ -108,17 +110,9 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     },
     async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const rostersResponse = await ctx.callLeagueApi(league_id, "rosters");
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ rosters: rostersResponse }, null, 3)}`,
-          },
-        ],
-        structuredContent: { rosters: rostersResponse },
-      };
+      return jsonResult({
+        rosters: await ctx.callLeagueApi(league_id, "rosters"),
+      });
     },
   );
 
@@ -148,17 +142,9 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     },
     async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const usersResponse = await ctx.callLeagueApi(league_id, "users");
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ users: usersResponse }, null, 3)}`,
-          },
-        ],
-        structuredContent: { users: usersResponse },
-      };
+      return jsonResult({
+        users: await ctx.callLeagueApi(league_id, "users"),
+      });
     },
   );
 
@@ -204,20 +190,9 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     },
     async ({ week, ...args }) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const matchupResponse = await ctx.callLeagueApi(
-        league_id,
-        `matchups/${week}`,
-      );
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ rosters: matchupResponse }, null, 3)}`,
-          },
-        ],
-        structuredContent: { rosters: matchupResponse },
-      };
+      return jsonResult({
+        rosters: await ctx.callLeagueApi(league_id, `matchups/${week}`),
+      });
     },
   );
 }

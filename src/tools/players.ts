@@ -2,7 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchPlayers } from "../playerSearch.js";
 import type { PlayerInfo } from "../players.js";
-import type { ToolContext } from "./context.js";
+import { jsonResult, type ToolContext } from "./context.js";
 
 /** At most this many players per get_player_details call. */
 const MAX_DETAIL_IDS = 100;
@@ -105,10 +105,7 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
         injury_status: p.injury_status,
       }));
 
-      return {
-        content: [{ type: "text", text: JSON.stringify({ players }, null, 2) }],
-        structuredContent: { players },
-      };
+      return jsonResult({ players });
     },
   );
 
@@ -145,10 +142,7 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
         not_found,
       };
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return jsonResult(result);
     },
   );
 
@@ -170,21 +164,9 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
       const id = (await ctx.getPlayers()).findByName(name)[0]?.player_id;
 
       if (!id) {
-        // Handle not found error
         throw new Error(`Could not find player ${name}`);
       }
-      // Return the response in the expected tool output format
-      return {
-        content: [
-          {
-            type: "text",
-            text: id,
-          },
-        ],
-        structuredContent: {
-          player_id: id,
-        },
-      };
+      return jsonResult({ player_id: id });
     },
   );
 
@@ -206,21 +188,9 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
       const name = (await ctx.getPlayers()).idToName.get(id);
 
       if (!name) {
-        // Handle not found error
         throw new Error(`Could not find player with id ${id}`);
       }
-      // Return the response in the expected tool output format
-      return {
-        content: [
-          {
-            type: "text",
-            text: name,
-          },
-        ],
-        structuredContent: {
-          player_name: name,
-        },
-      };
+      return jsonResult({ player_name: name });
     },
   );
 }
