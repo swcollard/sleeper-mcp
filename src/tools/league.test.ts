@@ -55,6 +55,12 @@ const stubSleeper = () =>
     if (url === "https://api.sleeper.app/v1/league/L1/rosters") {
       return Response.json([UNSCORED_ROSTER]);
     }
+    if (url === "https://api.sleeper.app/v1/state/nfl") {
+      return Response.json({ week: 3 });
+    }
+    if (url === "https://api.sleeper.app/v1/league/L1/matchups/3") {
+      return Response.json([]);
+    }
     if (url.includes("/league/")) return Response.json(null);
     return new Response("not stubbed", { status: 404 });
   });
@@ -166,5 +172,28 @@ describe("get_league_rosters", () => {
     expect(body.result.structuredContent).toEqual({
       rosters: [UNSCORED_ROSTER],
     });
+  });
+});
+
+describe("get_league_matchups", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("defaults to the current week", async () => {
+    const fetchFn = stubSleeper();
+    const handle = createFetchHandler({ fetchFn });
+    const body = await (
+      await handle(callTool(1, "get_league_matchups", { league_id: "L1" }))
+    ).json();
+
+    expect(body.result.isError).toBeUndefined();
+    expect(fetchFn.mock.calls.map(([url]) => String(url))).toContain(
+      "https://api.sleeper.app/v1/league/L1/matchups/3",
+    );
   });
 });

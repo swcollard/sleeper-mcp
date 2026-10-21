@@ -17,6 +17,7 @@ import {
 } from "../sleeper.js";
 import { teamNamesByRoster } from "../rosterOwners.js";
 import { jsonResult, type ToolContext } from "./context.js";
+import { playerSummarySchema } from "./schemas.js";
 
 const limitSchema = z
   .number()
@@ -95,12 +96,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           .optional()
           .describe("The league rostered_by refers to; absent without one"),
         players: z.array(
-          z.object({
-            player_id: z.string(),
-            name: z.string(),
-            position: z.string().nullable(),
-            team: z.string().nullable().describe("NFL team"),
-            injury_status: z.string().nullable(),
+          playerSummarySchema.extend({
             count: z
               .number()
               .describe("Number of adds or drops across Sleeper leagues"),
@@ -177,12 +173,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           .array(z.string())
           .describe("The positions searched (the league's, after the filter)"),
         players: z.array(
-          z.object({
-            player_id: z.string(),
-            name: z.string(),
-            position: z.string().nullable(),
-            team: z.string().nullable().describe("NFL team"),
-            injury_status: z.string().nullable(),
+          playerSummarySchema.extend({
             search_rank: z
               .number()
               .nullable()

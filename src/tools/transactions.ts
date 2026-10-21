@@ -5,6 +5,7 @@ import type { Roster, Transaction, User } from "../sleeper.js";
 import { teamNamesByRoster } from "../rosterOwners.js";
 import { summarizeTransactions, TRANSACTION_TYPES } from "../transactions.js";
 import { jsonResult, type ToolContext } from "./context.js";
+import { weekSchema } from "./schemas.js";
 
 const teamSchema = z.string().describe("Team name");
 
@@ -17,13 +18,7 @@ export function registerTransactionTools(server: McpServer, ctx: ToolContext) {
         "Fetches a week's trades, waiver claims, free agent pickups and commissioner moves in a Sleeper league, newest first, with team and player names. Includes failed waiver claims (status failed).",
       inputSchema: {
         league_id: ctx.leagueIdInput,
-        week: z
-          .number()
-          .int()
-          .min(1)
-          .max(18)
-          .optional()
-          .describe("The week to fetch. Defaults to the current NFL week."),
+        week: weekSchema,
         type: z
           .enum(TRANSACTION_TYPES)
           .optional()

@@ -13,7 +13,7 @@ export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
       title:
         "Get current weeks matchups and scores for a Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football matchups and their scores from the Sleeper API for a given league id. The week is provided by get_nfl_state.",
+        "Fetches a week's fantasy football matchups and their scores in a Sleeper league, with team and player names. Defaults to the current week.",
       inputSchema: {
         league_id: ctx.leagueIdInput,
         week: weekSchema,
@@ -44,8 +44,9 @@ export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
         ),
       },
     },
-    async ({ week, ...args }) => {
+    async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
+      const week = await ctx.resolveWeek(args.week);
       const [usersResponse, rostersResponse, matchupResponse, players]: [
         User[],
         Roster[],

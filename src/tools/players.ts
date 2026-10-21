@@ -3,6 +3,7 @@ import { z } from "zod";
 import { searchPlayers } from "../playerSearch.js";
 import type { PlayerInfo } from "../players.js";
 import { jsonResult, type ToolContext } from "./context.js";
+import { playerInfoSchema, playerSummarySchema } from "./schemas.js";
 
 /** At most this many players per get_player_details call. */
 const MAX_DETAIL_IDS = 100;
@@ -11,38 +12,6 @@ const MAX_DETAIL_IDS = 100;
 const playerIdSchema = z
   .string()
   .regex(/^[A-Za-z0-9]{1,16}$/, "player ids must be short and alphanumeric");
-
-const playerInfoSchema = z.object({
-  player_id: z.string(),
-  name: z.string(),
-  position: z.string().nullable(),
-  fantasy_positions: z
-    .array(z.string())
-    .describe("Positions the player can fill in fantasy lineups"),
-  team: z.string().nullable().describe("NFL team abbreviation; null if none"),
-  number: z.number().nullable(),
-  status: z
-    .string()
-    .nullable()
-    .describe('e.g. "Active", "Inactive", "Injured Reserve"'),
-  injury_status: z
-    .string()
-    .nullable()
-    .describe('e.g. "Questionable", "Out", "IR"; null when healthy'),
-  injury_body_part: z.string().nullable(),
-  age: z.number().nullable(),
-  years_exp: z.number().nullable(),
-  depth_chart_position: z.string().nullable(),
-  depth_chart_order: z
-    .number()
-    .nullable()
-    .describe("1 for the starter at depth_chart_position"),
-  search_rank: z
-    .number()
-    .nullable()
-    .describe("Sleeper's overall ranking, lower is better"),
-  active: z.boolean(),
-}) satisfies z.ZodType<PlayerInfo>;
 
 export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
@@ -79,14 +48,7 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
       },
       outputSchema: {
         players: z.array(
-          playerInfoSchema.pick({
-            player_id: true,
-            name: true,
-            position: true,
-            team: true,
-            status: true,
-            injury_status: true,
-          }),
+          playerSummarySchema.extend({ status: playerInfoSchema.shape.status }),
         ),
       },
     },

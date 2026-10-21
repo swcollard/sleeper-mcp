@@ -3,7 +3,7 @@ import { z } from "zod";
 import { leagueDetails } from "../leagues.js";
 import type { League } from "../sleeper.js";
 import { jsonResult, type ToolContext } from "./context.js";
-import { leagueIdSchema, leagueSummaryFields, weekSchema } from "./schemas.js";
+import { leagueSummaryFields, lineupFields, weekSchema } from "./schemas.js";
 
 export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
@@ -70,23 +70,12 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
         rosters: z.array(
           z.object({
             roster_id: z.number(),
-            starters: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
-              ),
-            players: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
-              ),
+            ...lineupFields,
             owner_id: z
               .string()
               .nullable()
               .describe("Null if the team has no owner (orphaned)"),
-            league_id: leagueIdSchema,
+            league_id: z.string(),
             settings: z.object({
               wins: z.number(),
               waiver_position: z.number(),
@@ -148,7 +137,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Matchups for Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football matchups from the Sleeper API for a given league id. Rosters with the same matchup_id are going head to head. The week is provided by get_nfl_state.",
+        "Fetches a week's fantasy football matchups in a Sleeper league. Rosters with the same matchup_id are going head to head. Defaults to the current week.",
       inputSchema: {
         league_id: ctx.leagueIdInput,
         week: weekSchema,
@@ -157,18 +146,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
         rosters: z.array(
           z.object({
             roster_id: z.number(),
-            starters: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
-              ),
-            players: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
-              ),
+            ...lineupFields,
             matchup_id: z
               .number()
               .nullable()
@@ -183,8 +161,9 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
         ),
       },
     },
-    async ({ week, ...args }) => {
+    async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
+      const week = await ctx.resolveWeek(args.week);
       return jsonResult({
         rosters: await ctx.callLeagueApi(league_id, `matchups/${week}`),
       });

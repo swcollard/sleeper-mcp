@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PlayerInfo } from "../players.js";
 
 // Sleeper league ids are numeric strings; restricting the charset keeps model
 // input from rewriting the request path (e.g. "../state/nfl").
@@ -11,9 +12,65 @@ export const weekSchema = z
   .int()
   .min(1)
   .max(18)
-  .describe(
-    "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
-  );
+  .optional()
+  .describe("The week to fetch. Defaults to the current NFL week.");
+
+export const playerInfoSchema = z.object({
+  player_id: z.string(),
+  name: z.string(),
+  position: z.string().nullable(),
+  fantasy_positions: z
+    .array(z.string())
+    .describe("Positions the player can fill in fantasy lineups"),
+  team: z.string().nullable().describe("NFL team abbreviation; null if none"),
+  number: z.number().nullable(),
+  status: z
+    .string()
+    .nullable()
+    .describe('e.g. "Active", "Inactive", "Injured Reserve"'),
+  injury_status: z
+    .string()
+    .nullable()
+    .describe('e.g. "Questionable", "Out", "IR"; null when healthy'),
+  injury_body_part: z.string().nullable(),
+  age: z.number().nullable(),
+  years_exp: z.number().nullable(),
+  depth_chart_position: z.string().nullable(),
+  depth_chart_order: z
+    .number()
+    .nullable()
+    .describe("1 for the starter at depth_chart_position"),
+  search_rank: z
+    .number()
+    .nullable()
+    .describe("Sleeper's overall ranking, lower is better"),
+  active: z.boolean(),
+}) satisfies z.ZodType<PlayerInfo>;
+
+/** The player fields tools include when listing players. */
+export const playerSummarySchema = playerInfoSchema.pick({
+  player_id: true,
+  name: true,
+  position: true,
+  team: true,
+  injury_status: true,
+});
+
+/** A roster's player ids, as Sleeper's rosters and matchups list them. */
+export const lineupFields = {
+  starters: z
+    .array(z.string())
+    .nullable()
+    .describe(
+      "Player ids in the starting lineup, in slot order; null before the draft. get_player_details gives their names.",
+    ),
+  players: z
+    .array(z.string())
+    .nullable()
+    .describe(
+      "Every player id on the roster; null before the draft. Those not in starters are on the bench.",
+    ),
+};
 
 /** The fields find_user_leagues and get_league share; see summarizeLeague. */
 export const leagueSummaryFields = {

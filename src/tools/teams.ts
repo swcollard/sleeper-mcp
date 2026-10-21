@@ -4,17 +4,7 @@ import type { PlayerDirectory } from "../players.js";
 import type { Roster, User } from "../sleeper.js";
 import { buildLeagueTeams } from "../teams.js";
 import { jsonResult, type ToolContext } from "./context.js";
-
-const teamPlayerSchema = z.object({
-  player_id: z.string(),
-  name: z.string(),
-  position: z.string().nullable(),
-  team: z.string().nullable().describe("NFL team abbreviation; null if none"),
-  injury_status: z
-    .string()
-    .nullable()
-    .describe('e.g. "Questionable", "Out", "IR"; null when healthy'),
-});
+import { playerSummarySchema } from "./schemas.js";
 
 export function registerTeamTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
@@ -54,11 +44,11 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
             points_for: z.number(),
             points_against: z.number(),
             starters: z
-              .array(teamPlayerSchema.nullable())
+              .array(playerSummarySchema.nullable())
               .describe("In lineup slot order; null for an empty slot"),
-            bench: z.array(teamPlayerSchema),
-            reserve: z.array(teamPlayerSchema).describe("Players on IR"),
-            taxi: z.array(teamPlayerSchema),
+            bench: z.array(playerSummarySchema),
+            reserve: z.array(playerSummarySchema).describe("Players on IR"),
+            taxi: z.array(playerSummarySchema),
           }),
         ),
       },
