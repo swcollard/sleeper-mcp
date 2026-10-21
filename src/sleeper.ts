@@ -4,6 +4,9 @@
 
 export const SLEEPER_API = "https://api.sleeper.app/v1";
 
+/** Sleeper's placeholder in `starters` for a lineup slot with no player. */
+export const EMPTY_SLOT = "0";
+
 /** GET /state/nfl */
 export type NflState = {
   week: number;
@@ -67,12 +70,13 @@ export type Roster = {
   owner_id: string | null; // user_id; null for orphaned teams
   players: string[] | null; // player IDs; null before the draft
   starters: string[] | null; // player IDs; null before the draft
-  // Points are split into a whole part and hundredths: fpts + fpts_decimal / 100
+  // Points are split into a whole part and hundredths: fpts + fpts_decimal / 100.
+  // Rosters that haven't scored yet leave them out.
   settings: {
-    fpts: number;
-    fpts_decimal: number;
-    fpts_against: number;
-    fpts_against_decimal: number;
+    fpts?: number;
+    fpts_decimal?: number;
+    fpts_against?: number;
+    fpts_against_decimal?: number;
     wins: number;
     losses: number;
     ties: number;

@@ -107,7 +107,19 @@ describe("buildLeagueTeams", () => {
   it("treats missing points fields as 0", () => {
     const [team] = buildLeagueTeams(
       users,
-      [roster({ settings: { wins: 0, losses: 0, ties: 0, fpts: 0 } as never })],
+      [
+        {
+          ...roster({}),
+          settings: {
+            wins: 0,
+            losses: 0,
+            ties: 0,
+            total_moves: 0,
+            waiver_position: 0,
+            waiver_budget_used: 0,
+          },
+        },
+      ],
       players,
     );
 

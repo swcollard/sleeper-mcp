@@ -1,5 +1,10 @@
 import { buildRosterOwners } from "./rosterOwners.js";
-import type { MatchupEntry, Roster, User } from "./sleeper.js";
+import {
+  EMPTY_SLOT,
+  type MatchupEntry,
+  type Roster,
+  type User,
+} from "./sleeper.js";
 
 export type { MatchupEntry, Roster, User };
 
@@ -45,8 +50,8 @@ export function buildScoreboard(
       grouped.set(e.matchup_id, matchupGroup);
     }
     const owner = owners.get(e.roster_id);
-    const starters = e.starters ?? [];
-    const players = e.players ?? [];
+    const starters = (e.starters ?? []).filter((id) => id !== EMPTY_SLOT);
+    const players = (e.players ?? []).filter((id) => id !== EMPTY_SLOT);
     const score: ScoreBoardEntry = {
       user_name: owner?.owner_name ?? "",
       team_name: owner?.team_name ?? "",

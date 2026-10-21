@@ -26,6 +26,23 @@ const LEAGUE = {
   avatar: null,
 };
 
+// A new league's roster: Sleeper leaves out the points fields until it scores
+const UNSCORED_ROSTER = {
+  roster_id: 1,
+  owner_id: "u1",
+  players: null,
+  starters: null,
+  league_id: "L1",
+  settings: {
+    wins: 0,
+    losses: 0,
+    ties: 0,
+    total_moves: 0,
+    waiver_position: 1,
+    waiver_budget_used: 0,
+  },
+};
+
 const stubSleeper = () =>
   vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
@@ -34,6 +51,9 @@ const stubSleeper = () =>
     }
     if (url === "https://api.sleeper.app/v1/league/L2") {
       return Response.json({ ...LEAGUE, league_id: "L2", settings: {} });
+    }
+    if (url === "https://api.sleeper.app/v1/league/L1/rosters") {
+      return Response.json([UNSCORED_ROSTER]);
     }
     if (url.includes("/league/")) return Response.json(null);
     return new Response("not stubbed", { status: 404 });
@@ -124,5 +144,27 @@ describe("get_league", () => {
     const body = await getLeague({});
     expect(body.result.isError).toBe(true);
     expect(body.result.content[0].text).toContain("find_user_leagues");
+  });
+});
+
+describe("get_league_rosters", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns rosters that haven't scored yet", async () => {
+    const handle = createFetchHandler({ fetchFn: stubSleeper() });
+    const body = await (
+      await handle(callTool(1, "get_league_rosters", { league_id: "L1" }))
+    ).json();
+
+    expect(body.result.isError).toBeUndefined();
+    expect(body.result.structuredContent).toEqual({
+      rosters: [UNSCORED_ROSTER],
+    });
   });
 });
