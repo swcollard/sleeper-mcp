@@ -1,9 +1,6 @@
 import type { PlayerInfo } from "./players.js";
 import { buildRosterOwners } from "./rosterOwners.js";
-import type { Roster, User } from "./sleeper.js";
-
-/** Sleeper's placeholder in `starters` for a lineup slot with no player. */
-export const EMPTY_SLOT = "0";
+import { EMPTY_SLOT, type Roster, type User } from "./sleeper.js";
 
 export type TeamPlayer = {
   player_id: string;
@@ -27,10 +24,6 @@ export type LeagueTeam = {
   taxi: TeamPlayer[];
 };
 
-/**
- * Sleeper splits points into a whole part and hundredths. A new league's
- * rosters can lack the fields, so they default to 0.
- */
 function points(whole: number | undefined, hundredths: number | undefined) {
   // Rounded so float error doesn't leak out (120 + 0.34 isn't always 120.34)
   return Math.round((whole ?? 0) * 100 + (hundredths ?? 0)) / 100;

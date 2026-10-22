@@ -1,4 +1,5 @@
 # sleeper-mcp
+
 Typescript MCP Server implementation for Sleeper Fantasy Football API
 
 The same tools can run two ways: as a standalone Node server, or as a Cloudflare Worker. Both serve stateless Streamable HTTP at `/mcp`.
@@ -83,18 +84,19 @@ The logic lives in `src/transactions.ts` and `src/freeAgents.ts`; the tools are 
 
 - `search_players` finds players and team defenses by name: exact names first, then partial names ("mahomes", "pat mah"), then small typos ("mahomse"). Defenses also match their team's nickname or abbreviation ("Chiefs", "KC"). It can filter by position and NFL team (`"FA"` for free agents), and returns up to 50 results (10 by default). The matching is in `src/playerSearch.ts`.
 - `get_player_details` returns position, team, injury status, depth chart and more for up to 100 player ids at once, with `as_of` saying when the player data was downloaded. Unknown ids are listed in `not_found`.
-- `get_league_teams` returns each team in a league (or one, by `roster_id`) with its owner, record, points, and players by name split into starters, bench, IR and taxi. An empty lineup slot is `null` in `starters`. The join is in `src/teams.ts`, using `src/rosterOwners.ts` (roster id to owner and team name), which the scoreboard shares.
+- `get_league_teams` returns each team in a league (or one, by `roster_id`) with its owner, record, points, and players by name split into starters, bench, IR and taxi. An empty lineup slot is `null` in `starters`. The join is in `src/teams.ts`, using `src/rosterOwners.ts` (roster id to owner and team name), which the scoreboard, transactions and trending players share.
 
 ## Development
 
 - `npm test` runs the unit tests.
 - `npm run typecheck` type-checks everything, tests included (`npm run build` leaves tests out).
+- `npm run lint` lints with oxlint, and `npm run format` formats with Prettier.
 
-CI runs both, plus the build and a Worker bundle check (`wrangler deploy --dry-run`), on every pull request.
+CI runs all of these (checking formatting with `npm run format:check`), plus the build and a Worker bundle check (`wrangler deploy --dry-run`), on every pull request.
 
 ### Layout
 
-- `src/mcp.ts` creates the MCP server; each module in `src/tools/` registers one group of tools, using the shared helpers in `src/tools/context.ts` (league id handling, Sleeper calls).
+- `src/mcp.ts` creates the MCP server; each module in `src/tools/` registers one group of tools, using the shared helpers in `src/tools/context.ts` (league id and week handling, Sleeper calls, results) and the shared schemas in `src/tools/schemas.ts`.
 - `src/sleeper.ts` has types for Sleeper API responses.
 - `src/players.ts` builds the player directory (lookups by id and name, and player details) and refreshes it daily; `src/playerFile.ts` is the Node server's file cache of it.
 - `src/server.ts` (Node) and `src/worker.ts` (Cloudflare Worker) are the two entry points.

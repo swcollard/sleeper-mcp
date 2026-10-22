@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { NflState, Roster, Transaction, User } from "./sleeper.js";
-import {
-  defaultWeek,
-  summarizeTransactions,
-  teamNamesByRoster,
-} from "./transactions.js";
+import { teamNamesByRoster } from "./rosterOwners.js";
+import type { Roster, Transaction, User } from "./sleeper.js";
+import { summarizeTransactions } from "./transactions.js";
 
 const users: User[] = [
   {
@@ -66,29 +63,6 @@ const transaction = (overrides: Partial<Transaction>): Transaction => ({
   settings: null,
   metadata: null,
   ...overrides,
-});
-
-describe("defaultWeek", () => {
-  const state = (week: number) => ({ week }) as NflState;
-
-  it("uses the state's week, kept within 1–18", () => {
-    expect(defaultWeek(state(5))).toBe(5);
-    // Sleeper reports week 0 in the preseason
-    expect(defaultWeek(state(0))).toBe(1);
-    expect(defaultWeek(state(19))).toBe(18);
-  });
-});
-
-describe("teamNamesByRoster", () => {
-  it("prefers the team name, then the display name, then the roster id", () => {
-    expect(teamNames).toEqual(
-      new Map([
-        [1, "Alice's Aces"],
-        [2, "Bob"],
-        [3, "Team 3"],
-      ]),
-    );
-  });
 });
 
 describe("summarizeTransactions", () => {

@@ -258,6 +258,18 @@ describe("buildScoreboard", () => {
     });
   });
 
+  it("leaves out empty lineup slots", () => {
+    const [matchup] = buildScoreboard(
+      users,
+      rosters,
+      [entry({ starters: ["p1", "0"], players: ["p1", "p2"] })],
+      playerNames,
+      1,
+    );
+
+    expect(matchup?.entries[0]?.starters).toEqual(["Patrick Mahomes"]);
+  });
+
   it("returns an empty scoreboard when there are no matchup entries", () => {
     expect(buildScoreboard(users, rosters, [], playerNames, 1)).toEqual([]);
   });

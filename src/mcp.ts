@@ -1,7 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { jsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/types.js";
-import type { PlayerDirectory } from "./players.js";
-import { createToolContext } from "./tools/context.js";
+import { createToolContext, type ToolContextDeps } from "./tools/context.js";
 import { registerLeagueTools } from "./tools/league.js";
 import { registerPlayerTools } from "./tools/players.js";
 import { registerScoreboardTools } from "./tools/scoreboard.js";
@@ -11,13 +10,7 @@ import { registerTransactionTools } from "./tools/transactions.js";
 import { registerMarketTools } from "./tools/market.js";
 import { registerTeamTools } from "./tools/teams.js";
 
-export type McpServerDeps = {
-  /** Cached JSON GET helper, see createApiClient. */
-  callApi: (url: string) => Promise<any>;
-  /** Resolves player lookups; may load them lazily. */
-  getPlayers: () => Promise<PlayerDirectory>;
-  /** League id the league tools use when called without one. */
-  defaultLeagueId?: string | undefined;
+export type McpServerDeps = ToolContextDeps & {
   /** Override the SDK's default (ajv) validator, which Workers can't run. */
   jsonSchemaValidator?: jsonSchemaValidator;
 };
@@ -26,8 +19,6 @@ export type McpServerDeps = {
  * Creates an MCP server with all Sleeper tools registered. An McpServer can
  * only be connected to one transport at a time, so stateless HTTP handlers
  * must create one per request; callApi and getPlayers carry the shared state.
- *
- * Each module in ./tools registers one group of tools.
  */
 export function createMcpServer({
   callApi,

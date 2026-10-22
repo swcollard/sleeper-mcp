@@ -15,8 +15,9 @@ import {
   type TrendingPlayer,
   type User,
 } from "../sleeper.js";
-import { defaultWeek, teamNamesByRoster } from "../transactions.js";
-import type { ToolContext } from "./context.js";
+import { teamNamesByRoster } from "../rosterOwners.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
+import { playerSummarySchema } from "./schemas.js";
 
 const limitSchema = z
   .number()
@@ -71,6 +72,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
       title: "Get Trending Players on Sleeper",
       description:
         "Fetches the players most added or dropped across all Sleeper leagues over the last lookback_hours. If a league is given (or a default league is set), also says which team in that league has each player, or null for free agents.",
+      annotations: READ_ONLY,
       inputSchema: {
         type: z
           .enum(["add", "drop"])
@@ -95,12 +97,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           .optional()
           .describe("The league rostered_by refers to; absent without one"),
         players: z.array(
-          z.object({
-            player_id: z.string(),
-            name: z.string(),
-            position: z.string().nullable(),
-            team: z.string().nullable().describe("NFL team"),
-            injury_status: z.string().nullable(),
+          playerSummarySchema.extend({
             count: z
               .number()
               .describe("Number of adds or drops across Sleeper leagues"),
@@ -128,11 +125,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
         ctx.callApi(
           `${SLEEPER_API}/players/nfl/trending/${encodeURIComponent(type)}?${query}`,
         ),
-        // Player details are a nicety here; fall back to ids if they can't load
-        ctx.getPlayers().catch((error) => {
-          console.error("Error loading player data:", error);
-          return undefined;
-        }),
+        ctx.tryGetPlayers(),
         rosteredIn(args.league_id),
       ]);
 
@@ -155,10 +148,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           };
         }),
       };
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return jsonResult(result);
     },
   );
 
@@ -168,6 +158,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
       title: "Get Free Agents in Sleeper Fantasy League",
       description:
         "Lists the best available players in a Sleeper league: active NFL players at positions the league starts who aren't on any roster (including IR and taxi). Ranked by Sleeper's overall player ranking, not a weekly projection. may_be_on_waivers marks players dropped this week, who may still be on waivers rather than free agents; it's approximate.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         position: z
@@ -184,12 +175,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           .array(z.string())
           .describe("The positions searched (the league's, after the filter)"),
         players: z.array(
-          z.object({
-            player_id: z.string(),
-            name: z.string(),
-            position: z.string().nullable(),
-            team: z.string().nullable().describe("NFL team"),
-            injury_status: z.string().nullable(),
+          playerSummarySchema.extend({
             search_rank: z
               .number()
               .nullable()
@@ -212,10 +198,8 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
         ctx.callLeagueApi(league_id),
         ctx.callLeagueApi(league_id, "rosters"),
         ctx
-          .getNflState()
-          .then((state) =>
-            ctx.callLeagueApi(league_id, `transactions/${defaultWeek(state)}`),
-          ),
+          .resolveWeek(undefined)
+          .then((week) => ctx.callLeagueApi(league_id, `transactions/${week}`)),
         // Unlike other tools, this can't work without player data
         ctx.getPlayers(),
       ]);
@@ -236,10 +220,7 @@ export function registerMarketTools(server: McpServer, ctx: ToolContext) {
           limit,
         }),
       };
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return jsonResult(result);
     },
   );
 }
