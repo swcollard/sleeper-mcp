@@ -1,5 +1,10 @@
 import { buildRosterOwners } from "./rosterOwners.js";
-import type { MatchupEntry, Roster, User } from "./sleeper.js";
+import {
+  EMPTY_SLOT,
+  type MatchupEntry,
+  type Roster,
+  type User,
+} from "./sleeper.js";
 
 export type { MatchupEntry, Roster, User };
 
@@ -15,8 +20,9 @@ export type ScoreBoardEntry = {
   starters: string[];
   players: string[];
   total_points: number;
-  players_points: Record<string, number>; // player name to points score
-  starters_points: Record<string, number>; // starters name to points score
+  /** Keyed by player name */
+  players_points: Record<string, number>;
+  starters_points: Record<string, number>;
   matchup_id: number | null;
 };
 
@@ -36,7 +42,6 @@ export function buildScoreboard(
 ): Matchup[] {
   const owners = buildRosterOwners(users, rosters);
 
-  // Group entries into matchups by matchup_id
   const grouped = new Map<number | null, ScoreBoardEntry[]>();
   for (const e of matchupEntries) {
     let matchupGroup = grouped.get(e.matchup_id);
@@ -45,8 +50,8 @@ export function buildScoreboard(
       grouped.set(e.matchup_id, matchupGroup);
     }
     const owner = owners.get(e.roster_id);
-    const starters = e.starters ?? [];
-    const players = e.players ?? [];
+    const starters = (e.starters ?? []).filter((id) => id !== EMPTY_SLOT);
+    const players = (e.players ?? []).filter((id) => id !== EMPTY_SLOT);
     const score: ScoreBoardEntry = {
       user_name: owner?.owner_name ?? "",
       team_name: owner?.team_name ?? "",
@@ -61,7 +66,7 @@ export function buildScoreboard(
       ),
       starters_points: Object.fromEntries(
         Object.entries(e.players_points)
-          .filter(([id, _]) => starters.includes(id))
+          .filter(([id]) => starters.includes(id))
           .map(([id, points]) => [playerIdToName.get(id) || id, points]),
       ),
       matchup_id: e.matchup_id,

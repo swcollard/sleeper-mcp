@@ -25,6 +25,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
       # Covers the tests too, which `npm run build` leaves out
       - run: npm run typecheck
       - run: npm run build

@@ -3,18 +3,8 @@ import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import type { Roster, User } from "../sleeper.js";
 import { buildLeagueTeams } from "../teams.js";
-import type { ToolContext } from "./context.js";
-
-const teamPlayerSchema = z.object({
-  player_id: z.string(),
-  name: z.string(),
-  position: z.string().nullable(),
-  team: z.string().nullable().describe("NFL team abbreviation; null if none"),
-  injury_status: z
-    .string()
-    .nullable()
-    .describe('e.g. "Questionable", "Out", "IR"; null when healthy'),
-});
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
+import { playerSummarySchema } from "./schemas.js";
 
 export function registerTeamTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
@@ -23,6 +13,7 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
       title: "Get Teams in a Sleeper Fantasy League",
       description:
         "Fetches every team in a Sleeper league, or one team by roster_id: its owner, team name, record, points, and players by name, split into starters, bench, IR (reserve) and taxi squad.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         roster_id: z
@@ -54,11 +45,11 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
             points_for: z.number(),
             points_against: z.number(),
             starters: z
-              .array(teamPlayerSchema.nullable())
+              .array(playerSummarySchema.nullable())
               .describe("In lineup slot order; null for an empty slot"),
-            bench: z.array(teamPlayerSchema),
-            reserve: z.array(teamPlayerSchema).describe("Players on IR"),
-            taxi: z.array(teamPlayerSchema),
+            bench: z.array(playerSummarySchema),
+            reserve: z.array(playerSummarySchema).describe("Players on IR"),
+            taxi: z.array(playerSummarySchema),
           }),
         ),
       },
@@ -72,11 +63,7 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
       ] = await Promise.all([
         ctx.callLeagueApi(league_id, "users"),
         ctx.callLeagueApi(league_id, "rosters"),
-        // Player names are a nicety here; fall back to ids if they can't load
-        ctx.getPlayers().catch((error) => {
-          console.error("Error loading player data:", error);
-          return undefined;
-        }),
+        ctx.tryGetPlayers(),
       ]);
 
       const rosters =
@@ -92,10 +79,7 @@ export function registerTeamTools(server: McpServer, ctx: ToolContext) {
         players?.byId ?? new Map(),
       );
 
-      return {
-        content: [{ type: "text", text: JSON.stringify({ teams }, null, 2) }],
-        structuredContent: { teams },
-      };
+      return jsonResult({ teams });
     },
   );
 }

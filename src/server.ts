@@ -7,13 +7,8 @@ import { createMcpServer } from "./mcp.js";
 import { loadPlayersFromFile } from "./playerFile.js";
 import { createPlayerCache } from "./players.js";
 
-//----
-// Load Player Data
-//----
-
 const PLAYER_DATA_FILE_PATH = process.env.PLAYER_DATA_FILE || "/tmp/nfl.json";
 
-// Refreshed in the background once the data is a day old
 const getPlayers = createPlayerCache(() =>
   loadPlayersFromFile(PLAYER_DATA_FILE_PATH),
 );
@@ -26,10 +21,6 @@ getPlayers().catch((error) =>
 const callApi = createApiClient();
 
 const DEFAULT_LEAGUE_ID = process.env.DEFAULT_LEAGUE_ID;
-
-//----
-// HTTP server
-//----
 
 const apiKeys = parseApiKeys(process.env.API_KEY);
 if (apiKeys.length === 0) {
@@ -53,9 +44,7 @@ app.use("/mcp", async (req, res, next) => {
 app.use(express.json());
 
 app.post("/mcp", async (req, res) => {
-  // Stateless mode: an McpServer can only be connected to one transport at a
-  // time, so concurrent requests each need their own server and transport.
-  // Each client can pick its league in the URL it connects to
+  // Stateless mode: a fresh server and transport per request
   const leagueParam = req.query.league_id;
   const server = createMcpServer({
     callApi,
@@ -92,8 +81,8 @@ app.post("/mcp", async (req, res) => {
   }
 });
 
-const port = parseInt(process.env.PORT || "3000");
-app
+const port = parseInt(process.env.PORT || "3000", 10);
+const httpServer = app
   .listen(port, () => {
     console.log(`Sleeper MCP Server running on http://localhost:${port}/mcp`);
   })
@@ -101,3 +90,9 @@ app
     console.error("Server error:", error);
     process.exit(1);
   });
+
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    httpServer.close(() => process.exit(0));
+  });
+}

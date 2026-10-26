@@ -2,13 +2,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import type { Roster, Transaction, User } from "../sleeper.js";
-import {
-  defaultWeek,
-  summarizeTransactions,
-  teamNamesByRoster,
-  TRANSACTION_TYPES,
-} from "../transactions.js";
-import type { ToolContext } from "./context.js";
+import { teamNamesByRoster } from "../rosterOwners.js";
+import { summarizeTransactions, TRANSACTION_TYPES } from "../transactions.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
+import { weekSchema } from "./schemas.js";
 
 const teamSchema = z.string().describe("Team name");
 
@@ -19,15 +16,10 @@ export function registerTransactionTools(server: McpServer, ctx: ToolContext) {
       title: "Get Transactions for Sleeper Fantasy League",
       description:
         "Fetches a week's trades, waiver claims, free agent pickups and commissioner moves in a Sleeper league, newest first, with team and player names. Includes failed waiver claims (status failed).",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
-        week: z
-          .number()
-          .int()
-          .min(1)
-          .max(18)
-          .optional()
-          .describe("The week to fetch. Defaults to the current NFL week."),
+        week: weekSchema,
         type: z
           .enum(TRANSACTION_TYPES)
           .optional()
@@ -84,7 +76,7 @@ export function registerTransactionTools(server: McpServer, ctx: ToolContext) {
     },
     async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const week = args.week ?? defaultWeek(await ctx.getNflState());
+      const week = await ctx.resolveWeek(args.week);
       const [transactions, users, rosters, players]: [
         Transaction[],
         User[],
@@ -94,11 +86,7 @@ export function registerTransactionTools(server: McpServer, ctx: ToolContext) {
         ctx.callLeagueApi(league_id, `transactions/${week}`),
         ctx.callLeagueApi(league_id, "users"),
         ctx.callLeagueApi(league_id, "rosters"),
-        // Player names are a nicety here; fall back to ids if they can't load
-        ctx.getPlayers().catch((error) => {
-          console.error("Error loading player data:", error);
-          return undefined;
-        }),
+        ctx.tryGetPlayers(),
       ]);
 
       const result = {
@@ -110,10 +98,7 @@ export function registerTransactionTools(server: McpServer, ctx: ToolContext) {
           args.type,
         ),
       };
-      return {
-        content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-        structuredContent: result,
-      };
+      return jsonResult(result);
     },
   );
 }

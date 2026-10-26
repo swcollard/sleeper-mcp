@@ -1,21 +1,15 @@
 import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import { SLEEPER_API, type NflState } from "../sleeper.js";
+import { leagueIdSchema } from "./schemas.js";
 
-// Sleeper league ids are numeric strings; restricting the charset keeps model
-// input from rewriting the request path (e.g. "../state/nfl").
-export const leagueIdSchema = z
-  .string()
-  .regex(/^[A-Za-z0-9]+$/, "league_id must be alphanumeric");
-
-export const weekSchema = z
-  .number()
-  .int()
-  .min(1)
-  .max(18)
-  .describe(
-    "The week of the league to fetch matchups for. The current week can be fetched from get_nfl_state if the user does not request a specific week.",
-  );
+/**
+ * The week week-based tools default to. Sleeper's state week is 0 in the
+ * preseason, and fantasy weeks end at 18, so it's clamped to 1–18.
+ */
+export function defaultWeek(state: NflState): number {
+  return Math.min(18, Math.max(1, state.week || 1));
+}
 
 /** What every tool module gets; see createMcpServer. */
 export type ToolContext = {
@@ -23,6 +17,8 @@ export type ToolContext = {
   callApi: (url: string) => Promise<any>;
   /** Resolves player lookups; may load them lazily. */
   getPlayers: () => Promise<PlayerDirectory>;
+  /** getPlayers for tools that can fall back to player ids; undefined if it fails. */
+  tryGetPlayers: () => Promise<PlayerDirectory | undefined>;
   /**
    * Fetches a league, or a sub-resource of it like "rosters". Sleeper answers
    * an unknown league id with 200 and a `null` body, so this throws instead.
@@ -30,6 +26,8 @@ export type ToolContext = {
   callLeagueApi: (league_id: string, path?: string) => Promise<any>;
   /** The current NFL week and season, for tools whose week or season is optional. */
   getNflState: () => Promise<NflState>;
+  /** Returns the given week, else the current one (see defaultWeek). */
+  resolveWeek: (week: number | undefined) => Promise<number>;
   /**
    * The `league_id` input for league tools. It's optional: when omitted,
    * resolveLeagueId falls back to the default league.
@@ -37,6 +35,11 @@ export type ToolContext = {
   leagueIdInput: z.ZodOptional<typeof leagueIdSchema>;
   /** Returns the given league id, else the default league, else throws. */
   resolveLeagueId: (league_id: string | undefined) => string;
+};
+
+export type ToolContextDeps = Pick<ToolContext, "callApi" | "getPlayers"> & {
+  /** League id the league tools use when called without one. */
+  defaultLeagueId?: string | undefined;
 };
 
 /**
@@ -48,11 +51,7 @@ export function createToolContext({
   callApi,
   getPlayers,
   defaultLeagueId,
-}: {
-  callApi: ToolContext["callApi"];
-  getPlayers: ToolContext["getPlayers"];
-  defaultLeagueId?: string | undefined;
-}): ToolContext {
+}: ToolContextDeps): ToolContext {
   const callLeagueApi = async (league_id: string, path?: string) => {
     const data = await callApi(
       `${SLEEPER_API}/league/${encodeURIComponent(league_id)}${path ? `/${path}` : ""}`,
@@ -63,8 +62,17 @@ export function createToolContext({
     return data;
   };
 
+  const tryGetPlayers = () =>
+    getPlayers().catch((error) => {
+      console.error("Error loading player data:", error);
+      return undefined;
+    });
+
   const getNflState = (): Promise<NflState> =>
     callApi(`${SLEEPER_API}/state/nfl`);
+
+  const resolveWeek = async (week: number | undefined) =>
+    week ?? defaultWeek(await getNflState());
 
   const validDefault =
     defaultLeagueId === undefined
@@ -97,9 +105,22 @@ export function createToolContext({
   return {
     callApi,
     getPlayers,
+    tryGetPlayers,
     callLeagueApi,
     getNflState,
+    resolveWeek,
     leagueIdInput,
     resolveLeagueId,
+  };
+}
+
+/** Every tool only reads from Sleeper, an external service. */
+export const READ_ONLY = { readOnlyHint: true, openWorldHint: true } as const;
+
+/** A tool result carrying data as both JSON text and structured content. */
+export function jsonResult<T extends Record<string, unknown>>(data: T) {
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }],
+    structuredContent: data,
   };
 }

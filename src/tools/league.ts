@@ -2,8 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { leagueDetails } from "../leagues.js";
 import type { League } from "../sleeper.js";
-import { leagueIdSchema, weekSchema, type ToolContext } from "./context.js";
-import { leagueSummaryFields } from "./users.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
+import { leagueSummaryFields, lineupFields, weekSchema } from "./schemas.js";
 
 export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
@@ -12,6 +12,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
       title: "Get Settings for Sleeper Fantasy League",
       description:
         "Fetches a fantasy football league's settings from the Sleeper API: its name, season, status, lineup slots, scoring, playoff format, waivers and trade deadline.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
       },
@@ -53,10 +54,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
       const league: League = await ctx.callLeagueApi(league_id);
       const details = leagueDetails(league);
 
-      return {
-        content: [{ type: "text", text: JSON.stringify(details, null, 2) }],
-        structuredContent: details,
-      };
+      return jsonResult(details);
     },
   );
 
@@ -65,7 +63,8 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Rosters for Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football rosters from the Sleeper API for a given league id.",
+        "Fetches the rosters in a Sleeper league: each roster's owner id, player ids, record and waiver settings. get_league_teams returns the same teams with names.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
       },
@@ -73,23 +72,12 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
         rosters: z.array(
           z.object({
             roster_id: z.number(),
-            starters: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
-              ),
-            players: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
-              ),
+            ...lineupFields,
             owner_id: z
               .string()
               .nullable()
               .describe("Null if the team has no owner (orphaned)"),
-            league_id: leagueIdSchema,
+            league_id: z.string(),
             settings: z.object({
               wins: z.number(),
               waiver_position: z.number(),
@@ -97,10 +85,10 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
               total_moves: z.number(),
               ties: z.number(),
               losses: z.number(),
-              fpts_decimal: z.number(),
-              fpts_against_decimal: z.number(),
-              fpts_against: z.number(),
-              fpts: z.number(),
+              fpts_decimal: z.number().optional(),
+              fpts_against_decimal: z.number().optional(),
+              fpts_against: z.number().optional(),
+              fpts: z.number().optional(),
             }),
           }),
         ),
@@ -108,17 +96,9 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     },
     async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const rostersResponse = await ctx.callLeagueApi(league_id, "rosters");
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ rosters: rostersResponse }, null, 3)}`,
-          },
-        ],
-        structuredContent: { rosters: rostersResponse },
-      };
+      return jsonResult({
+        rosters: await ctx.callLeagueApi(league_id, "rosters"),
+      });
     },
   );
 
@@ -127,7 +107,8 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Users for Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football users from the Sleeper API for a given league id, this provides metatdata to be combined with the get_league_rosters tool to get a full picture of the existing league.",
+        "Fetches the users in a Sleeper league, with their display and team names. A user's user_id matches owner_id in get_league_rosters.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
       },
@@ -148,17 +129,9 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     },
     async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const usersResponse = await ctx.callLeagueApi(league_id, "users");
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ users: usersResponse }, null, 3)}`,
-          },
-        ],
-        structuredContent: { users: usersResponse },
-      };
+      return jsonResult({
+        users: await ctx.callLeagueApi(league_id, "users"),
+      });
     },
   );
 
@@ -167,7 +140,8 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
     {
       title: "Get Matchups for Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football matchups from the Sleeper API for a given league id. Rosters with the same matchup_id are going head to head. The week is provided by get_nfl_state.",
+        "Fetches a week's fantasy football matchups in a Sleeper league. Rosters with the same matchup_id are going head to head. Defaults to the current week.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         week: weekSchema,
@@ -176,18 +150,7 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
         rosters: z.array(
           z.object({
             roster_id: z.number(),
-            starters: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the starting lineup. Can use get_player_name tool to swap with names",
-              ),
-            players: z
-              .array(z.string())
-              .nullable()
-              .describe(
-                "Null before the draft. The list of player ids in the roster. Can use get_player_name tool to swap with names. Any ID in players but not starters is assumed to be on the bench.",
-              ),
+            ...lineupFields,
             matchup_id: z
               .number()
               .nullable()
@@ -202,22 +165,12 @@ export function registerLeagueTools(server: McpServer, ctx: ToolContext) {
         ),
       },
     },
-    async ({ week, ...args }) => {
+    async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
-      const matchupResponse = await ctx.callLeagueApi(
-        league_id,
-        `matchups/${week}`,
-      );
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ rosters: matchupResponse }, null, 3)}`,
-          },
-        ],
-        structuredContent: { rosters: matchupResponse },
-      };
+      const week = await ctx.resolveWeek(args.week);
+      return jsonResult({
+        rosters: await ctx.callLeagueApi(league_id, `matchups/${week}`),
+      });
     },
   );
 }

@@ -3,16 +3,17 @@ import { z } from "zod";
 import type { PlayerDirectory } from "../players.js";
 import { buildScoreboard } from "../scoreboard.js";
 import type { MatchupEntry, Roster, User } from "../sleeper.js";
-import { weekSchema, type ToolContext } from "./context.js";
+import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
+import { weekSchema } from "./schemas.js";
 
 export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
   server.registerTool(
     "get_matchup_scoreboard",
     {
-      title:
-        "Get current weeks matchups and scores for a Sleeper Fantasy League",
+      title: "Get Matchup Scoreboard for Sleeper Fantasy League",
       description:
-        "Fetches a list of fantasy football matchups and their scores from the Sleeper API for a given league id. The week is provided by get_nfl_state.",
+        "Fetches a week's fantasy football matchups and their scores in a Sleeper league, with team and player names. Defaults to the current week.",
+      annotations: READ_ONLY,
       inputSchema: {
         league_id: ctx.leagueIdInput,
         week: weekSchema,
@@ -43,8 +44,9 @@ export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
         ),
       },
     },
-    async ({ week, ...args }) => {
+    async (args) => {
       const league_id = ctx.resolveLeagueId(args.league_id);
+      const week = await ctx.resolveWeek(args.week);
       const [usersResponse, rostersResponse, matchupResponse, players]: [
         User[],
         Roster[],
@@ -54,11 +56,7 @@ export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
         ctx.callLeagueApi(league_id, "users"),
         ctx.callLeagueApi(league_id, "rosters"),
         ctx.callLeagueApi(league_id, `matchups/${week}`),
-        // Player names are a nicety here; fall back to ids if they can't load
-        ctx.getPlayers().catch((error) => {
-          console.error("Error loading player data:", error);
-          return undefined;
-        }),
+        ctx.tryGetPlayers(),
       ]);
 
       const matchupList = buildScoreboard(
@@ -69,16 +67,7 @@ export function registerScoreboardTools(server: McpServer, ctx: ToolContext) {
         week,
       );
 
-      // Return the response in the expected tool output format
-      return {
-        content: [
-          {
-            type: "text",
-            text: `${JSON.stringify({ scoreboard: matchupList }, null, 5)}`,
-          },
-        ],
-        structuredContent: { scoreboard: matchupList },
-      };
+      return jsonResult({ scoreboard: matchupList });
     },
   );
 }

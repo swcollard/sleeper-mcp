@@ -25,21 +25,10 @@ type KVNamespaceLike = {
 };
 
 export type Env = {
-  /**
-   * Optional KV namespace for caching player data across isolates. Without
-   * it, each isolate downloads Sleeper's player list on first use.
-   */
+  /** Caches player data across isolates. */
   PLAYERS_KV?: KVNamespaceLike;
-  /**
-   * Comma-separated API keys; requests must send one as `x-api-key: <key>`
-   * or `Authorization: Bearer <key>`. Set with `wrangler secret put API_KEY`.
-   * When unset, the server accepts all requests.
-   */
+  /** Comma-separated API keys; see parseApiKeys. */
   API_KEY?: string;
-  /**
-   * League the league tools use when called without a league_id. A client's
-   * `?league_id=` query parameter on the MCP URL takes precedence.
-   */
   DEFAULT_LEAGUE_ID?: string;
 };
 
@@ -67,9 +56,7 @@ async function loadPlayers(
   let cached: CachedPlayers | null | undefined;
   try {
     cached = (await env.PLAYERS_KV?.get(PLAYERS_KV_KEY, "json")) as
-      | CachedPlayers
-      | null
-      | undefined;
+      CachedPlayers | null | undefined;
   } catch (error) {
     console.error("Error reading player data from KV:", error);
   }
@@ -150,7 +137,6 @@ export function createFetchHandler({
       callApi,
       getPlayers,
       jsonSchemaValidator,
-      // Each client can pick its league in the URL it connects to
       defaultLeagueId:
         searchParams.get("league_id") || env.DEFAULT_LEAGUE_ID || undefined,
     });
