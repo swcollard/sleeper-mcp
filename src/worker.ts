@@ -136,6 +136,7 @@ export function createFetchHandler({
     const server = createMcpServer({
       callApi,
       getPlayers,
+      now,
       jsonSchemaValidator,
       defaultLeagueId:
         searchParams.get("league_id") || env.DEFAULT_LEAGUE_ID || undefined,

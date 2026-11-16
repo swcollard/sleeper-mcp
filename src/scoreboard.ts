@@ -1,3 +1,4 @@
+import type { GameStatus } from "./gameStatus.js";
 import { buildRosterOwners } from "./rosterOwners.js";
 import {
   EMPTY_SLOT,
@@ -23,6 +24,11 @@ export type ScoreBoardEntry = {
   /** Keyed by player name */
   players_points: Record<string, number>;
   starters_points: Record<string, number>;
+  /**
+   * Keyed by player name like starters_points; says why a starter has the
+   * points they have (bye, not started...). Left out when it can't be told.
+   */
+  starters_game_status?: Record<string, GameStatus>;
   matchup_id: number | null;
 };
 
@@ -31,7 +37,8 @@ export type ScoreBoardEntry = {
  * entries are grouped by matchup_id, joined to their owner's name/team, and
  * player ids are swapped for player names (falling back to the id if unknown).
  * Matchups are ordered by matchup_id; entries with no matchup_id (null) are
- * collected into a single group at the end.
+ * collected into a single group at the end. When gameStatusFor is given, each
+ * entry also says what stage every starter's game is at.
  */
 export function buildScoreboard(
   users: User[],
@@ -39,6 +46,7 @@ export function buildScoreboard(
   matchupEntries: MatchupEntry[],
   playerIdToName: ReadonlyMap<string, string>,
   week: number,
+  gameStatusFor?: (playerId: string) => GameStatus | undefined,
 ): Matchup[] {
   const owners = buildRosterOwners(users, rosters);
 
@@ -71,6 +79,14 @@ export function buildScoreboard(
       ),
       matchup_id: e.matchup_id,
     };
+    if (gameStatusFor) {
+      const statuses: Record<string, GameStatus> = {};
+      for (const id of starters) {
+        const status = gameStatusFor(id);
+        if (status) statuses[playerIdToName.get(id) || id] = status;
+      }
+      score.starters_game_status = statuses;
+    }
 
     matchupGroup.push(score);
   }

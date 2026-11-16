@@ -86,6 +86,19 @@ The logic lives in `src/transactions.ts` and `src/freeAgents.ts`; the tools are 
 - `get_player_details` returns position, team, injury status, depth chart and more for up to 100 player ids at once, with `as_of` saying when the player data was downloaded. Unknown ids are listed in `not_found`.
 - `get_league_teams` returns each team in a league (or one, by `roster_id`) with its owner, record, points, and players by name split into starters, bench, IR and taxi. An empty lineup slot is `null` in `starters`. The join is in `src/teams.ts`, using `src/rosterOwners.ts` (roster id to owner and team name), which the scoreboard, transactions and trending players share.
 
+## Game status
+
+Sleeper reports 0 points for a player on bye, one whose game hasn't started, one who is injured and one who played and scored nothing. To tell them apart, `get_matchup_scoreboard` adds `starters_game_status` (by player name, like `starters_points`) and `get_player_details` adds `game_status` (for the current week, or a `week` argument). Each is a `status` of:
+
+- `bye`: the team doesn't play that week
+- `not_started`: the game hasn't kicked off; `kickoff` gives the time
+- `in_progress`: the game is on, so points can still change
+- `final`: the game is over, so points are final and a 0 is real
+- `out`: ruled out by injury (a final game wins over this, since the injury status is current, not that week's)
+- `inactive`: not on an NFL team, or on IR, the practice squad, suspended...
+
+It comes from Sleeper's NFL schedule (`https://api.sleeper.com/schedule/nfl/regular/{season}`), which is not in Sleeper's documented API, so its response shape is assumed and Sleeper may change it. The schedule is one extra request per call, made in parallel with the others and cached for 30 seconds like them. If it fails, returns something unexpected or takes over 3 seconds, the tools still answer, just without the status. A team the schedule doesn't list is never reported as on bye. The logic is in `src/gameStatus.ts`.
+
 ## Development
 
 - `npm test` runs the unit tests.
@@ -98,5 +111,6 @@ CI runs all of these (checking formatting with `npm run format:check`), plus the
 
 - `src/mcp.ts` creates the MCP server; each module in `src/tools/` registers one group of tools, using the shared helpers in `src/tools/context.ts` (league id and week handling, Sleeper calls, results) and the shared schemas in `src/tools/schemas.ts`.
 - `src/sleeper.ts` has types for Sleeper API responses.
+- `src/gameStatus.ts` parses Sleeper's schedule and works out a player's game status.
 - `src/players.ts` builds the player directory (lookups by id and name, and player details) and refreshes it daily; `src/playerFile.ts` is the Node server's file cache of it.
 - `src/server.ts` (Node) and `src/worker.ts` (Cloudflare Worker) are the two entry points.

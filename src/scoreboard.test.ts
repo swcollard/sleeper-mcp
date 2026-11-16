@@ -273,4 +273,43 @@ describe("buildScoreboard", () => {
   it("returns an empty scoreboard when there are no matchup entries", () => {
     expect(buildScoreboard(users, rosters, [], playerNames, 1)).toEqual([]);
   });
+
+  it("adds each starter's game status by name only when given a lookup", () => {
+    const entries = [
+      entry({
+        starters: ["p1", "p2", "unknown"],
+        players: ["p1", "p2", "p3"],
+        players_points: { p1: 0, p2: 0, p3: 0 },
+      }),
+    ];
+    const lookup = (id: string) =>
+      id === "p1"
+        ? ({
+            status: "not_started",
+            kickoff: "2026-11-15T18:00:00.000Z",
+          } as const)
+        : id === "p2"
+          ? ({ status: "bye" } as const)
+          : undefined;
+
+    const [without] = buildScoreboard(users, rosters, entries, playerNames, 1);
+    const [withLookup] = buildScoreboard(
+      users,
+      rosters,
+      entries,
+      playerNames,
+      1,
+      lookup,
+    );
+
+    expect(without?.entries[0]).not.toHaveProperty("starters_game_status");
+    // Starters the lookup can't tell about are left out, bench players too
+    expect(withLookup?.entries[0]?.starters_game_status).toEqual({
+      "Patrick Mahomes": {
+        status: "not_started",
+        kickoff: "2026-11-15T18:00:00.000Z",
+      },
+      "Travis Kelce": { status: "bye" },
+    });
+  });
 });
