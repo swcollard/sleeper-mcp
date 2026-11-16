@@ -1,6 +1,17 @@
 import { z } from "zod";
+import {
+  gameStatusFor,
+  parseSchedule,
+  type GameStatus,
+  type Schedule,
+  type StatusPlayer,
+} from "../gameStatus.js";
 import type { PlayerDirectory } from "../players.js";
-import { SLEEPER_API, type NflState } from "../sleeper.js";
+import {
+  SLEEPER_API,
+  SLEEPER_SCHEDULE_API,
+  type NflState,
+} from "../sleeper.js";
 import { leagueIdSchema } from "./schemas.js";
 
 /**
@@ -10,6 +21,18 @@ import { leagueIdSchema } from "./schemas.js";
 export function defaultWeek(state: NflState): number {
   return Math.min(18, Math.max(1, state.week || 1));
 }
+
+/**
+ * How long game status lookups may delay a tool. They only add detail, so a
+ * slow schedule endpoint must not hold up the answer.
+ */
+export const GAME_STATUS_TIMEOUT_MS = 3000;
+
+/** Looks up players' game status for one week; see ToolContext.tryGetGameStatuses. */
+export type GameStatusLookup = {
+  week: number;
+  forPlayer: (player: StatusPlayer | undefined) => GameStatus | undefined;
+};
 
 /** What every tool module gets; see createMcpServer. */
 export type ToolContext = {
@@ -35,11 +58,22 @@ export type ToolContext = {
   leagueIdInput: z.ZodOptional<typeof leagueIdSchema>;
   /** Returns the given league id, else the default league, else throws. */
   resolveLeagueId: (league_id: string | undefined) => string;
+  /**
+   * Looks up whether players are on bye, yet to play, playing or done in the
+   * given week (default: the current one), from Sleeper's schedule. Resolves
+   * to undefined, never throws, if that can't be loaded within
+   * GAME_STATUS_TIMEOUT_MS: callers then leave game status out.
+   */
+  tryGetGameStatuses: (
+    week?: number | undefined,
+  ) => Promise<GameStatusLookup | undefined>;
 };
 
 export type ToolContextDeps = Pick<ToolContext, "callApi" | "getPlayers"> & {
   /** League id the league tools use when called without one. */
   defaultLeagueId?: string | undefined;
+  /** The clock game status is judged by, in ms since the epoch. */
+  now?: (() => number) | undefined;
 };
 
 /**
@@ -51,6 +85,7 @@ export function createToolContext({
   callApi,
   getPlayers,
   defaultLeagueId,
+  now = Date.now,
 }: ToolContextDeps): ToolContext {
   const callLeagueApi = async (league_id: string, path?: string) => {
     const data = await callApi(
@@ -73,6 +108,45 @@ export function createToolContext({
 
   const resolveWeek = async (week: number | undefined) =>
     week ?? defaultWeek(await getNflState());
+
+  // Fantasy weeks are regular season weeks, whatever phase the NFL is in now
+  const getSchedule = async (): Promise<Schedule | undefined> => {
+    const { season } = await getNflState();
+    return parseSchedule(
+      await callApi(
+        `${SLEEPER_SCHEDULE_API}/regular/${encodeURIComponent(season)}`,
+      ),
+    );
+  };
+
+  const tryGetGameStatuses = async (
+    week?: number,
+  ): Promise<GameStatusLookup | undefined> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error("timed out")),
+        GAME_STATUS_TIMEOUT_MS,
+      );
+    });
+    try {
+      const [resolvedWeek, schedule] = await Promise.race([
+        Promise.all([resolveWeek(week), getSchedule()]),
+        timeout,
+      ]);
+      if (!schedule) return undefined;
+      return {
+        week: resolvedWeek,
+        forPlayer: (player) =>
+          gameStatusFor(player, resolvedWeek, schedule, now()),
+      };
+    } catch (error) {
+      console.error("Error loading game status:", error);
+      return undefined;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 
   const validDefault =
     defaultLeagueId === undefined
@@ -111,6 +185,7 @@ export function createToolContext({
     resolveWeek,
     leagueIdInput,
     resolveLeagueId,
+    tryGetGameStatuses,
   };
 }
 

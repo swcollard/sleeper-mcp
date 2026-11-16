@@ -1,9 +1,15 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { searchPlayers } from "../playerSearch.js";
+import type { GameStatus } from "../gameStatus.js";
 import type { PlayerInfo } from "../players.js";
 import { jsonResult, READ_ONLY, type ToolContext } from "./context.js";
-import { playerInfoSchema, playerSummarySchema } from "./schemas.js";
+import {
+  gameStatusSchema,
+  playerInfoSchema,
+  playerSummarySchema,
+  weekSchema,
+} from "./schemas.js";
 
 /** At most this many players per get_player_details call. */
 const MAX_DETAIL_IDS = 100;
@@ -75,10 +81,13 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
     "get_player_details",
     {
       title: "Get Player Details",
-      description: `Fetches details for up to ${MAX_DETAIL_IDS} players by id: position, NFL team, injury status, depth chart, age and experience. Ids that don't match a player are listed in not_found.`,
+      description: `Fetches details for up to ${MAX_DETAIL_IDS} players by id: position, NFL team, injury status, depth chart, age and experience, plus game_status: whether the player's game this week (or the given week) is a bye, not started, in progress or final, which explains a score of 0. Ids that don't match a player are listed in not_found.`,
       annotations: READ_ONLY,
       inputSchema: {
         player_ids: z.array(playerIdSchema).min(1).max(MAX_DETAIL_IDS),
+        week: weekSchema.describe(
+          "The week game_status is for. Defaults to the current NFL week.",
+        ),
       },
       outputSchema: {
         as_of: z
@@ -86,21 +95,43 @@ export function registerPlayerTools(server: McpServer, ctx: ToolContext) {
           .describe(
             "When this player data was downloaded from Sleeper (ISO 8601)",
           ),
-        players: z.array(playerInfoSchema),
+        week: z
+          .number()
+          .optional()
+          .describe(
+            "The week game_status is for; left out when the schedule can't be loaded",
+          ),
+        players: z.array(
+          playerInfoSchema.extend({
+            game_status: gameStatusSchema
+              .optional()
+              .describe(
+                "Left out when the schedule can't be loaded or doesn't cover this player",
+              ),
+          }),
+        ),
         not_found: z.array(z.string()),
       },
     },
-    async ({ player_ids }) => {
-      const directory = await ctx.getPlayers();
-      const players: PlayerInfo[] = [];
+    async ({ player_ids, week }) => {
+      const [directory, games] = await Promise.all([
+        ctx.getPlayers(),
+        ctx.tryGetGameStatuses(week),
+      ]);
+      const players: (PlayerInfo & { game_status?: GameStatus })[] = [];
       const not_found: string[] = [];
       for (const id of new Set(player_ids)) {
         const player = directory.byId.get(id);
-        if (player) players.push(player);
-        else not_found.push(id);
+        if (!player) {
+          not_found.push(id);
+          continue;
+        }
+        const game_status = games?.forPlayer(player);
+        players.push(game_status ? { ...player, game_status } : player);
       }
       const result = {
         as_of: new Date(directory.fetchedAt).toISOString(),
+        ...(games && { week: games.week }),
         players,
         not_found,
       };

@@ -4,6 +4,13 @@
 
 export const SLEEPER_API = "https://api.sleeper.app/v1";
 
+/**
+ * Base of Sleeper's NFL schedule endpoint, `/{season_type}/{season}`. It isn't
+ * in Sleeper's documented API, so ScheduleGame is how it looks as far as we
+ * know, and parseSchedule tolerates anything else.
+ */
+export const SLEEPER_SCHEDULE_API = "https://api.sleeper.com/schedule/nfl";
+
 /** Sleeper's placeholder in `starters` for a lineup slot with no player. */
 export const EMPTY_SLOT = "0";
 
@@ -24,6 +31,21 @@ export type NflState = {
   league_create_season: string;
   display_week: number;
   season_has_scores: boolean;
+};
+
+/**
+ * One game of SLEEPER_SCHEDULE_API's response, an array of these. Undocumented:
+ * every field is optional here because none is guaranteed.
+ */
+export type ScheduleGame = {
+  week?: number;
+  /** NFL team abbreviations, as in a player's `team` */
+  home?: string;
+  away?: string;
+  /** Believed to be "pre_game", "in_game" or "complete" */
+  status?: string | null;
+  /** Kickoff: ms since the epoch (seconds also tolerated) or an ISO string */
+  start_time?: number | string | null;
 };
 
 /** GET /user/{username or user_id} */

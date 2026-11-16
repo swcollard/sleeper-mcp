@@ -24,6 +24,7 @@ export function createMcpServer({
   callApi,
   getPlayers,
   defaultLeagueId,
+  now,
   jsonSchemaValidator,
 }: McpServerDeps): McpServer {
   const server = new McpServer(
@@ -33,7 +34,12 @@ export function createMcpServer({
     },
     jsonSchemaValidator ? { jsonSchemaValidator } : {},
   );
-  const ctx = createToolContext({ callApi, getPlayers, defaultLeagueId });
+  const ctx = createToolContext({
+    callApi,
+    getPlayers,
+    defaultLeagueId,
+    now,
+  });
 
   registerStateTools(server, ctx);
   registerPlayerTools(server, ctx);

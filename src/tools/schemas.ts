@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { GAME_STATES } from "../gameStatus.js";
 import type { PlayerInfo } from "../players.js";
 
 // Sleeper league ids are numeric strings; restricting the charset keeps model
@@ -46,6 +47,29 @@ export const playerInfoSchema = z.object({
     .describe("Sleeper's overall ranking, lower is better"),
   active: z.boolean(),
 }) satisfies z.ZodType<PlayerInfo>;
+
+/**
+ * Whether a player's game is yet to be played, under way or done, which tells
+ * what a score of 0 means; see GAME_STATES.
+ */
+export const gameStatusSchema = z.object({
+  status: z
+    .enum(GAME_STATES)
+    .describe(
+      [
+        "bye: the team doesn't play this week",
+        "not_started: the game hasn't kicked off, so 0 points just means not played yet",
+        "in_progress: the game is on and points can still change",
+        "final: the game is over, so points are final and a 0 is real",
+        "out: ruled out by injury, so a 0 is expected",
+        "inactive: not on an NFL team or active roster (IR, practice squad, suspended...)",
+      ].join("; "),
+    ),
+  kickoff: z
+    .string()
+    .optional()
+    .describe("Kickoff time (ISO 8601); only for games that aren't over"),
+});
 
 /** The player fields tools include when listing players. */
 export const playerSummarySchema = playerInfoSchema.pick({
